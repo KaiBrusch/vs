@@ -9,7 +9,7 @@
 
 -module(cmem).
 -author("kbrusch").
--export([initCMEM/2, getClientNNr/2, updateClient/4, delExpiredCl/2]).
+-export([initCMEM/2, getClientNNr/2, updateClient/4, delExpiredCl/1]).
 
 % initCMEM(RemTime, Datei)
 
@@ -32,7 +32,62 @@ initCMEM(RemTime, Datei) ->
 %% return: aktualisiertes CMEM
 
 updateClient(CMEM, ClientID, NNr, Datei) ->
-  CMEM.
+
+  if
+
+    exists(ClientID, CMEM) -> update_last_message(ClientID,NNr, CMEM);
+
+    not_exists(ClientID, CMEM) -> create(ClientID,CMEM)
+
+  end.
+
+% Listhelper
+not_exists(ClientID, CMEM) ->
+  not exists(ClientID, CMEM).
+
+exists(_, []) ->
+  false;
+
+exists(ClientID, [{ClientID, _LastMessageNumber, _Time}| _Queue] ) ->
+  true;
+
+exists(ClientID, [_| _Queue]) ->
+  exists(ClientID, _Queue).
+
+create(ClientID, CMEM) ->
+  [{ClientID, 1, erlang:now()}]++CMEM.
+
+
+update_last_message(_, _, []) ->
+  [];
+
+update_last_message(ClientID, NNr, [{ClientID, _LastMessageNumber, Time}| _Queue]) ->
+  [{ClientID, NNr, Time} | _Queue];
+
+update_last_message(ClientID, NNr, [Head | Tail]) ->
+  [Head | set_last_message(ClientID, NNr, Tail)].
+
+
+get_last_message_id(_, []) ->
+  1;
+
+get_last_message_id(ClientID,[{ClientID, Last_message_id, _Time} | Queue]) ->
+  Last_message_id;
+
+get_last_message_id(ClientID,[_| Queue]) ->
+  get_last_message_id(ClientID, Queue).
+
+update_time_for_client(_,_, []) ->
+  [];
+
+update_time_for_client(ClientID, CurrentTime ,[{ClientID, LastMessageNumer,_Time} | Queue]) ->
+  [{ClientID, LastMessageNumer, CurrentTime}| Queue];
+
+update_time_for_client(ClientID, CurrentTime ,[Head| Tail]) ->
+  [Head| update_time_for_client(ClientID, CurrentTime, Tail)].
+
+
+
 
 
 % getClientNNr(CMEM, ClientID)
@@ -44,7 +99,7 @@ updateClient(CMEM, ClientID, NNr, Datei) ->
 % return: ClientID als Integer-Wert, wenn nicht vorhanden wird 1 zurückgegeben
 
 getClientNNr(CMEM, ClientID) ->
-  1.
+  get_last_message_id(ClientID, CMEM).
 
 % delExpiredCl(CMEM, Clientlifetime)
 
@@ -54,7 +109,8 @@ getClientNNr(CMEM, ClientID) ->
 %post: veränderte CMEM
 %return: Das Atom ok als Rückgabewert
 
-delExpiredCl(CMEM, Clientlifetime) ->
+delExpiredCl(CMEM) ->
+
   ok.
 
 
