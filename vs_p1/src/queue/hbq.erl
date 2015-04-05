@@ -119,7 +119,10 @@ pushHBQ(ServerPID, OldHBQ, [NNr, Msg, TSclientout]) ->
 %post: Der Client hat eine neue Nachricht erhalten, die DLQ ist um eine Nachricht kleiner geworden und der Server hat ein die tatsächlich gesendete Nachrichtennummer erhalten.
 %return: Atom ok wird zurückgegeben
 
-deliverMSG(ServerPID, DLQ, NNr, ToClient) -> ok.
+deliverMSG(ServerPID, DLQ, NNr, ToClient) ->
+
+  ToClient ! {}
+  {reply,ok}.
 
 
 % dellHBQ(ServerPID)
