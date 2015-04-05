@@ -21,16 +21,19 @@
 
 
 start() ->
-
+  % receive values from config
   {ok, ConfigListe}       = file:consult("../server.cfg"),
   {ok, HBQname}           = werkzeug:get_config_value(hbqname, ConfigListe),
+  {ok, DlqLimit}           = werkzeug:get_config_value(dlqlimit, ConfigListe),
 
+  % register this process
   erlang:register(HBQname ,self()),
 
+  % init logger file
   HBQLoggerFile= 'hbq.log',
-  io:fwrite("HBQ is up\n"),
 
-  loop(HBQLoggerFile, _).
+  % lifetime loop
+  loop(HBQLoggerFile,DlqLimit, _, _).
 .
 
 
@@ -51,23 +54,21 @@ start() ->
 % post: der Prozess wurde erfolgreich terminiert
 % return: hbq-process terminated als Atom
 
-loop(HBQName,HBQLoggerFile,HBQ) ->
+loop(DlqLimit,HBQLoggerFile,HBQ,DLQ) ->
   receive
 
     {ServerPID, {request, initHBQ}} ->
-      initHBQandDLQ(ServerPID)
-      , loop(HBQLoggerFile, HBQ)
-  ;
-    {ServerPID, {request, test}} ->
-      io:fwrite(ServerPID)
-      ,loop()
-
+      {HBQ, DLQ}=initHBQandDLQ(DlqLimit, ServerPID, HBQLoggerFile)
+      , loop(DlqLimit,HBQLoggerFile, HBQ, DLQ)
   ;
     {ServerPID, {request,pushHBQ,[NNr,Msg,TSclientout]}} ->
-      pushHBQ(ServerPID, HBQ,[NNr,Msg,TSclientout])
-
-
-    %{ServerPID, {request,deliverMSG,NNr,ToClient}} -> deliverMSG(ServerPID, DLQ, NNr, ToClient)
+      werkzeug:logging(HBQLoggerFile, 'gepusht')
+      , pushHBQ(ServerPID, HBQ,[NNr,Msg,TSclientout])
+      , loop(DlqLimit,HBQLoggerFile, HBQ)
+  ;
+    {ServerPID, {request,deliverMSG,NNr,ToClient}} ->
+      deliverMSG(ServerPID, DLQ, NNr, ToClient)
+      , loop(DlqLimit,HBQLoggerFile, HBQ)
 
 
 end.
@@ -84,7 +85,10 @@ end.
 % post: ein 2-Tupel wurde erstellt. Das 1. Element ist die HBQ und das 2. Element die DLQ.
 % return: 2-Tupel: {[], DLQ}
 
-initHBQandDLQ(ServerPID) -> ServerPID ! {[], DLQ}.
+initHBQandDLQ(Size, ServerPID, HBQLoggerFile) ->
+  ServerPID ! {reply, ok},
+  DLQ = dlq:initDLQ(Size,HBQLoggerFile),
+  {[], DLQ}.
 
 
 
@@ -99,9 +103,8 @@ initHBQandDLQ(ServerPID) -> ServerPID ! {[], DLQ}.
 % return: NewHBQ
 
 pushHBQ(ServerPID, OldHBQ, [NNr, Msg, TSclientout]) ->
-  werkzeug:logging(HBQLogger, 'gepusht'),
   ServerPID ! {reply, ok},
-  OldHBQ++[NNr, Msg, TSclientout].
+  OldHBQ++[{NNr, Msg, TSclientout}].
 
 
 
@@ -126,7 +129,10 @@ deliverMSG(ServerPID, DLQ, NNr, ToClient) -> ok.
 % post: der Prozess wurde erfolgreich beendet
 % return: Atom ok wird zurückgegeben
 
-dellHBQ(ServerPID) -> ok.
+dellHBQ(ServerPID) ->
+  % terminate this procces
+  ServerPID ! {reply, ok}.
+
 
 
 % pushSeries(HBQ, DLQ)
@@ -139,7 +145,13 @@ dellHBQ(ServerPID) -> ok.
 %post: veränderte HBQ- und DLQ-Datenstruktur
 %return: {HBQ, DLQ} als 2-Tupel
 
-pushSeries(HBQ, DLQ) -> {HBQ, DLQ}.
+pushSeries(HBQ, {Size, Queue}) ->
+  if
+    len(HBQ) == 2/3 * Size ->
+      ok;
+    len(HBQ) < 2/3 * Size ->
+      push_consisten(HBQ, Queue)
+  end.
 
 
 
