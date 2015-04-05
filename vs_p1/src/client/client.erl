@@ -10,16 +10,18 @@
 -author("kbrusch").
 
 %% API
--export([]).
+-export([start/0]).
 
 
--define(GRUPPE, 3).
--define(TEAM, 06).
+-define(GRUPPE, '3').
+-define(TEAM, '06').
 -define(MAXIMAL_RESPONSE_TIME_BEFORE_ERROR, 5000).
 -define(CLIENT_LOGGING_FILE, fun() -> werkzeug:message_to_string(erlang:date()) ++ "-ClientLog.txt" end).
 -define(REDAKTEUR_ATOM, redakteur).
 -define(LESER_ATOM, leser).
+-define(RECHNER_NAME, 'rechner@123').
 
+-include("../tools/werkzeug.erl").
 
 
 
@@ -40,9 +42,9 @@ switchRoles(?LESER_ATOM) ->
 
 
 
-fireAction({?REDAKTEUR_ATOM, Servername, Servernode},Interval,Flag) ->
-  sendMSG(Servername, Servernode,0,Interval,Flag);
-fireAction({?LESER_ATOM, Servername, Servernode},Interval,Flag) ->
+fireAction({?REDAKTEUR_ATOM, Servername, Servernode}, Interval, Flag) ->
+  sendMSG(Servername, Servernode, 0, Interval, Flag);
+fireAction({?LESER_ATOM, Servername, Servernode}, Interval, Flag) ->
   getMSG(Servername, Servernode).
 
 
@@ -56,8 +58,9 @@ fireAction({?LESER_ATOM, Servername, Servernode},Interval,Flag) ->
 
 start() ->
   {Clients, Lifetime, Servername, Servernode, Sendinterval} = readConfig(),
-  map(fun() -> spawn(loop(Lifetime, Servername, Servernode, Sendinterval)) end,list:seq(1,Clients)).
-
+  Range = list:seq(1, Clients),
+  lists:foreach(fun() ->
+    spawn(loop(Lifetime, Servername, Servernode, Sendinterval)) end, Range).
 
 
 % readConfig()
@@ -70,89 +73,90 @@ start() ->
 % return: {Clients, Lifetime, Servername, Servernode, Sendinterval}
 
 readConfig() ->
-  {ok, Configfile} = file:consult("../server.cfg"),
+  {ok, Configfile} = file:consult("../client.cfg"),
 
-  Clients = werkzeug:get_config_value(clients, Configfile),
-  Lifetime = werkzeug:get_config_value(lifetime, Configfile),
-  Servername = werkzeug:get_config_value(servername, Configfile),
-  Servernode = werkzeug:get_config_value(servernode, Configfile),
-  Sendinterval = werkzeug:get_config_value(sendinterval, Configfile),
+  {ok, Clients} = werkzeug:get_config_value(clients, Configfile),
+  {ok, Lifetime} = werkzeug:get_config_value(lifetime, Configfile),
+  {ok, Servername} = werkzeug:get_config_value(servername, Configfile),
+  {ok, Servernode} = werkzeug:get_config_value(servernode, Configfile),
+  {ok, Sendinterval} = werkzeug:get_config_value(sendinterval, Configfile),
   {Clients, Lifetime, Servername, Servernode, Sendinterval}.
 
 
-%loop(Lifetime, Servername, Servernode, Sendinterval)
 
-%% Definition: In der Hauptschleife werden die Nachrichten in bestimmten Zeitabständen an den Server versendet.
-%% Dabei wird die Methode „sendMSG(Servername, Servernode)“ verwendet.
-%% Weiterhin wird nach dem Senden von 5 Nachrichten die Methode „changeSendintervall(Sendinterval)“ aufgerufen, um das Sendeintervall neu zu berechnen.
-%% Ebenfalls nach 5 Nachrichten wird die Methode „askForMSGID(Servername, Servernode)“ aufgerufen.
-%% Hiermit wird der Server aufgefordert, ihm (dem Client) eine eindeutige Nachrichtennummer zu übermitteln.
-%% Sobald die Rolle des Leser-Clients übernommen wird (nach 5 gesendeten Nachrichten, siehe Aufgabenstellung), wird die Methode „getMSG(Servername, Servernode)“ aufgerufen.
-%% Weiterhin ist es notwendig in dieser Methode zu prüfen, wann die Lebenszeit des Clients vorüber ist.
-
-% pre: die nötigen Übergabeparameter sind korrekt eingelesen und der Server ist noch nicht terminiert
-% post: der Prozess wurde erfolgreich, nach angegebenen Kriterien, terminiert
-% return: client terminated als Atom
 
 loop(Lifetime, Servername, Servernode, Sendinterval) ->
-  % setze Sie hier weil anders nicht möglich
-  loop(Lifetime, Servername, Servernode, Sendinterval, erlang:now(), 0, ?REDAKTEUR_ATOM,0,false).
+  loop(Lifetime, Servername, Servernode, Sendinterval, erlang:now(), 1, ?REDAKTEUR_ATOM, 0, false).
 
 
-loop(Lifetime, Servername, Servernode, Sendinterval, StartTime, TransmittedNumber, Role,LastTimeSendedMsg,INNRflag) when not is_time_over(StartTime, Lifetime) ->
-  if TransmittedNumber rem 5 == 0 ->
-      NewRole = switchRoles(Role),
-      NewInterval = changeSendInterval(Sendinterval),
-      loop(Lifetime, Servername, Servernode, NewInterval, StartTime, 0, NewRole);
+
+loop(Lifetime, Servername, Servernode, Sendinterval, StartTime, TransmittedNumber, Role, LastTimeSendedMsg, INNRflag) ->
+
+  case not is_time_over(StartTime, Lifetime) of
     true ->
-      TimeStampMessageOut = fireAction(Role,LastTimeSendedMsg,INNRflag),
-      loop(Lifetime, Servername, Servernode, Sendinterval, StartTime, TransmittedNumber + 1, Role,TimeStampMessageOut,INNRflag)
-  end;
-loop(Lifetime, Servername, Servernode, Sendinterval, StartTime, TransmittedNumber, Role,LastTimeSendedMsg,INNRflag) when is_time_over(StartTime, Lifetime) ->
-  werkzeug:logging(?CLIENT_LOGGING_FILE, "ClientID-X Lifetime is over - terminating at" ++ werkzeug:to_String(now())),
-  erlang:exit("Lifetime is over").
-
-
-
-
-
-changeSendInterval(Sendinterval) when Sendinterval < 2 ->
-  2;
-changeSendInterval(Sendinterval) ->
-
-  Result = Sendinterval + random:uniform(Sendinterval) + Sendinterval / 2,
-  if Result > 2 ->
-    Result;
-    true ->
-      changeSendInterval(Sendinterval)
+      if TransmittedNumber rem 5 == 0 ->
+        NewRole = switchRoles(Role),
+        NewInterval = changeSendInterval(Sendinterval),
+        loop(Lifetime, Servername, Servernode, NewInterval, StartTime, 1, NewRole, 0, false);
+        true ->
+          ActionReturn = fireAction(Role, LastTimeSendedMsg, INNRflag),
+          case erlang:isNumber(ActionReturn) of
+            true ->
+              loop(Lifetime, Servername, Servernode, Sendinterval, StartTime, TransmittedNumber + 1, Role, ActionReturn, INNRflag);
+            false ->
+              loop(Lifetime, Servername, Servernode, Sendinterval, StartTime, 1, switchRoles(Role), 0, false)
+          end
+      end;
+    false ->
+      werkzeug:logging(?CLIENT_LOGGING_FILE, "ClientID-X Lifetime is over - terminating at" ++ werkzeug:to_String(now())),
+      erlang:exit("Lifetime is over")
   end.
 
 
-%  Definition: Dem Server wird folgende Nachricht übermittelt:
-% {self(), getmessages}. Er wartet auf die Antwort des Servers (DLQ) mit
-% folgendem Format: {reply,[NNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout], Terminated}.
-% Der Server wird somit aufgefordert alle Nachrichten einzeln an den Leser- Client zu übermitteln.
-% Diesen Vorgang wiederholt der Client solange, bis er alle Nachrichten bekommen hat und somit auf dem neuesten Stand ist.
-% Dies erkennt der Client an dem Flag Terminated(true).
-% Mithilfe des Moduls „werkzeug.erl“ können die Nachrichten in der GUI (Logfile) ausgegeben werden.
-% Nach jedem Erhalt einer Nachricht, fügt der Leser-Client eine eigene Nachricht,
-% der jeweiligen erhaltenen Nachricht, hinzu, sowie ein selbst erstellten Timestamp (siehe Anforderung 12).
-% pre: Server ist unter angegebenen Servername und Servernode weiterhin erreichbar post: Nachricht erfolgreich erhalten, damit sie geloggt werden kann
-% return: Atom ok wird zurückgegeben
+
+
+
+changeSendInterval(Sendinterval) ->
+  Probability = random:uniform(),
+  HalfInterval = Sendinterval / 2,
+  if Probability > 0.5 ->
+    changeSendInterval(Sendinterval + HalfInterval) + 2;
+    true ->
+      changeSendInterval(Sendinterval - HalfInterval) + 2
+  end.
+
+
+
+logIncomeMsg([NNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout], TimeStampClIn) ->
+  %etwa 6te_Nachricht. C Out: 11.11 21:12:58,720|(6); HBQ In: 11.11 21:12:58,720| DLQ In:11.11 21:13:01,880|.*******; C In: 11.11 21:13:07,190|
+  NewMessage = NNr ++
+    "te_Nachricht. C Out:" ++
+    werkzeug:now2UTC(TSclientout) ++
+    "| ; HBQ In:" ++
+    werkzeug:now2UTC(TShbqin) ++
+    "| ; DLQ In:" ++
+    werkzeug:now2UTC(TSdlqin) ++
+    "| ; C In:" ++
+    werkzeug:now2UTC(TimeStampClIn) ++
+    "| Nachricht:" ++
+    werkzeug:to_String(Msg),
+  werkzeug:logging(?CLIENT_LOGGING_FILE, NewMessage).
+
+
 
 getMSG(Servername, Servernode) ->
   {Servername, Servernode} ! {self(), getmessages},
   receive
-    {reply, [NNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout], Terminated} ->
-      % may log messages as controll function
+    {reply, [NNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout], true} ->
+      logIncomeMsg([NNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout], erlang:now()),
+      getMSG(Servername, Servernode);
+    {reply, [NNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout], false} ->
+      logIncomeMsg([NNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout], erlang:now()),
       ok
   after ?MAXIMAL_RESPONSE_TIME_BEFORE_ERROR ->
     werkzeug:logging(?CLIENT_LOGGING_FILE, "Leser did not response" ++ werkzeug:to_String(now()))
   end.
 
-
-% todo: implement receive method as controllstructure and for logging
-% todo: receive {nid, Number}
 
 askForMSGID(Servername, Servernode) ->
   {Servername, Servernode} ! {self(), getmsgid},
@@ -163,20 +167,27 @@ askForMSGID(Servername, Servernode) ->
   end.
 
 
-%Definition: Hier wird dem Server die Nachricht {dropmessage, [INNr, Msg, TSclientout]} gesendet. Auf eine Antwort des Server wird nicht gewartet.
-%pre: Server ist unter angegebenen Servername und Servernode weiterhin erreichbar
-%post: Server hat erfolgreich eine Nachricht erhalten
 
-sendMSG(Servername, Servernode,TimeLastSending,Interval,INNRflag) when not is_time_over(TimeLastSending,Interval)  ->
-  Msg = "clientname::" ++ "::" ++ "irgendEinText",
-  INNr = askForMSGID(Servername, Servernode),
-  timer:sleep(trunc(Interval*1000)),
-  Flag = INNRflag or is_number(INNr),
-  if Flag ->
-    SendingTime = erlang:now(),
-    {Servername, Servernode} ! {dropmessage, [INNr, Msg,SendingTime ]},
-    SendingTime;
-  true ->
-    werkzeug:logging(?CLIENT_LOGGING_FILE, "got an INNr error" ++ werkzeug:to_String(now()))
+sendMSG(Servername, Servernode, TimeLastSending, Interval, INNRflag) ->
+  case is_time_over(TimeLastSending, Interval) of
+    true ->
+      Msg = "Gruppe:" ++
+        werkzeug:to_String(?GRUPPE) ++
+        "; | Team:" ++
+        werkzeug:to_String(?TEAM) ++
+        "; | Rechnername:" ++
+        werkzeug:to_String(?RECHNER_NAME),
+      INNr = askForMSGID(Servername, Servernode),
+      timer:sleep(trunc(Interval * 1000)),
+      Flag = INNRflag or is_number(INNr),
+      if Flag ->
+        SendingTime = erlang:now(),
+        {Servername, Servernode} ! {dropmessage, [INNr, Msg, SendingTime]},
+        SendingTime;
+        true ->
+          werkzeug:logging(?CLIENT_LOGGING_FILE, "got an INNr error" ++ werkzeug:to_String(now()))
+      end;
+    false ->
+      werkzeug:logging(?CLIENT_LOGGING_FILE, "Try sendMSG but the interval time is not over " ++ werkzeug:to_String(now()))
   end.
 
