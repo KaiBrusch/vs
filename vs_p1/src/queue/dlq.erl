@@ -18,7 +18,8 @@
 % post: 2-Tupel mit Größenangabe, sowie einer leeren Liste
 % return: {Size, []} - 2-Tupel mit Size als 1. Element und einer leeren Liste als 2. Element
 
-initDLQ(Size, Datei) -> {Size, []}.
+initDLQ(Size, Datei) ->
+  {Size, []}.
 
 % expectedNr(Queue)
 
@@ -28,9 +29,13 @@ initDLQ(Size, Datei) -> {Size, []}.
 % post: Queue ist unverändert und eine korrekte Nachrichtennummer wurde zurückgegeben
 % return: nächste Nachrichtennummer die verwendet werden kann, sonst 1 bei leerer Liste
 
-expectedNr(Queue) ->
-  Nachrichtennummer = 3.
+expectedNr({Size, []}) ->
+  1.
 
+expectedNr({Size, Queue}) ->
+  get_next_message_numer(last(Queue)).
+
+get_next_message_numer([NNr, Msg, TSclientout, TShbqin]) -> NNr+1.
 
 % push2DLQ([NNr, Msg, TSclientout, TShbqin], Queue, Datei)
 
@@ -42,7 +47,16 @@ expectedNr(Queue) ->
 % return: die neue DLQ: NewDLQ ; wurde die maximale Größe der DLQ erreicht wird eine erkennbare Error-Meldung zurückgegeben
 
 
-push2DLQ([NNr, Msg, TSclientout, TShbqin], Queue, Datei) -> Queue.
+push2DLQ([{NNr, Msg, TSclientout, TShbqin}], {Size, Queue}, Datei) ->
+  if
+    len(Queue) == Size ->
+      werkzeug:logging('dlq full', Datei),
+      {dlq_full};
+
+    len(Queue) < Size ->
+      werkzeug:logging('added to dlq', Datei),
+      {Size, Queue++[{NNr, Msg, TSclientout, erlang:now()}]}
+  end.
 
 
 % deliverMSG(MSGNr, ClientPID, Queue, Datei)
@@ -58,8 +72,17 @@ push2DLQ([NNr, Msg, TSclientout, TShbqin], Queue, Datei) -> Queue.
 % return: die tatsächlich verschickte MSGNr als Integer-Wert an den HBQ-Prozess
 
 
-deliverMSG(MSGNr, ClientPID, Queue, Datei) -> 1.
+deliverMSG(MSGNr, ClientPID, {Size, Queue}, Datei) ->
+  find_message_numer(MSGNr, Queue).
+% antwort nachricht bauen etc, und gucken ob es die letzte Nachricht ist
+
+find_message_number(MSGNr, []) ->
+  [];
+
+find_message_number(MSGNr, [{MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout}|Queue]) ->
+  {MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout};
+
+find_message_number(MSGNr, [Head|Tail]) ->
+  [Head | find_message_number(MSGNr, Tail)].
 
 
-%% API
--export([]).

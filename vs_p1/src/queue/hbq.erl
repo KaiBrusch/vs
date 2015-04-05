@@ -8,18 +8,32 @@
 %%%-------------------------------------------------------------------
 -module(hbq).
 -author("kbrusch").
--export([]).
+-export([initHBQandDLQ/1,start/0]).
 
 
 %start()
 
 %% Definition: Startet einen neuen HBQ-Prozess, der die HBQ verwaltet und alleinigen Zugriff auf die DLQ besitzt.
 
-%pre: Server-Prozess ist gestartet
-%post: Es wurde ein neuer HBQ-Prozess gestartet der nun vom Server verwendet werden kann return: hbq-process started als Atom sonst eine sinnvolle Error-Meldung
+% pre: Server-Prozess ist gestartet
+% post: Es wurde ein neuer HBQ-Prozess gestartet der nun vom Server verwendet werden kann
+% return: hbq-process started als Atom sonst eine sinnvolle Error-Meldung
 
 
-start() -> 1.
+start() ->
+
+  {ok, ConfigListe}       = file:consult("../server.cfg"),
+  {ok, HBQname}           = werkzeug:get_config_value(hbqname, ConfigListe),
+
+  erlang:register(HBQname ,self()),
+
+  HBQLoggerFile= 'hbq.log',
+  io:fwrite("HBQ is up\n"),
+
+  loop(HBQLoggerFile, _).
+.
+
+
 
 
 % loop()
@@ -37,7 +51,26 @@ start() -> 1.
 % post: der Prozess wurde erfolgreich terminiert
 % return: hbq-process terminated als Atom
 
-loop() -> 1.
+loop(HBQName,HBQLoggerFile,HBQ) ->
+  receive
+
+    {ServerPID, {request, initHBQ}} ->
+      initHBQandDLQ(ServerPID)
+      , loop(HBQLoggerFile, HBQ)
+  ;
+    {ServerPID, {request, test}} ->
+      io:fwrite(ServerPID)
+      ,loop()
+
+  ;
+    {ServerPID, {request,pushHBQ,[NNr,Msg,TSclientout]}} ->
+      pushHBQ(ServerPID, HBQ,[NNr,Msg,TSclientout])
+
+
+    %{ServerPID, {request,deliverMSG,NNr,ToClient}} -> deliverMSG(ServerPID, DLQ, NNr, ToClient)
+
+
+end.
 
 
 % initHBQandDLQ(ServerPID)
@@ -51,7 +84,7 @@ loop() -> 1.
 % post: ein 2-Tupel wurde erstellt. Das 1. Element ist die HBQ und das 2. Element die DLQ.
 % return: 2-Tupel: {[], DLQ}
 
-initHBQandDLQ(ServerPID) -> {[], DLQ}.
+initHBQandDLQ(ServerPID) -> ServerPID ! {[], DLQ}.
 
 
 
@@ -65,7 +98,11 @@ initHBQandDLQ(ServerPID) -> {[], DLQ}.
 % post: Der alten HBQ wurde ein neues Element beigefügt und der Server hat eine Nachricht erhalten.
 % return: NewHBQ
 
-pushHBQ(ServerPID, OldHBQ, [NNr, Msg, TSclientout]) -> NewHBQ = hbq.
+pushHBQ(ServerPID, OldHBQ, [NNr, Msg, TSclientout]) ->
+  werkzeug:logging(HBQLogger, 'gepusht'),
+  ServerPID ! {reply, ok},
+  OldHBQ++[NNr, Msg, TSclientout].
+
 
 
 % deliverMSG(ServerPID, DLQ, NNr, ToClient)
@@ -105,5 +142,4 @@ dellHBQ(ServerPID) -> ok.
 pushSeries(HBQ, DLQ) -> {HBQ, DLQ}.
 
 
-%% API
--export([]).
+

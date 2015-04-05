@@ -111,7 +111,8 @@ getClientNNr(CMEM, ClientID) ->
 
 delExpiredCl(CMEM) ->
 
-  ok.
+  [CMEM || ]
+  filter(Expired, CMEM, )
 
 
 
