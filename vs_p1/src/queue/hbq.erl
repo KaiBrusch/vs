@@ -103,7 +103,8 @@ initHBQandDLQ(Size, ServerPID, HBQLoggerFile) ->
 pushHBQ(ServerPID, OldHBQ, [NNr, Msg, TSclientout]) ->
   ServerPID ! {reply, ok},
   NewHBQ = OldHBQ ++ [{NNr, Msg, TSclientout}],
-
+  %% wir sollten die alte hbq zurückgeben, darauf wird pushToDLq aufgerufen welches entscheidet ob etwas rübergeschoben wird
+  %% und die HBQ neu updated
   q.
 
 
