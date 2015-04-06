@@ -8,7 +8,7 @@
 %%%-------------------------------------------------------------------
 -module(dlq).
 -author("kbrusch").
--export([initDLQ/2,deliverMSG/4]).
+-export([initDLQ/2, deliverMSG/4]).
 
 % initDLQ(Size, Datei)
 
@@ -36,7 +36,7 @@ expectedNr({Size, []}) ->
 expectedNr({Size, Queue}) ->
   get_next_message_numer(last(Queue)).
 
-get_next_message_numer([NNr, Msg, TSclientout, TShbqin]) -> NNr+1.
+get_next_message_numer([NNr, Msg, TSclientout, TShbqin]) -> NNr + 1.
 
 % push2DLQ([NNr, Msg, TSclientout, TShbqin], Queue, Datei)
 
@@ -56,7 +56,7 @@ push2DLQ([{NNr, Msg, TSclientout, TShbqin}], {Size, Queue}, Datei) ->
 
     len(Queue) < Size ->
       werkzeug:logging('added to dlq', Datei),
-      {Size, Queue++[{NNr, Msg, TSclientout, erlang:now()}]}
+      {Size, Queue ++ [{NNr, Msg, TSclientout, erlang:now()}]}
   end.
 
 
@@ -80,10 +80,10 @@ deliverMSG(MSGNr, ClientPID, {Size, Queue}, Datei) ->
 find_message_number(MSGNr, []) ->
   [];
 
-find_message_number(MSGNr, [{MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout}|Queue]) ->
+find_message_number(MSGNr, [{MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout} | Queue]) ->
   {MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout};
 
-find_message_number(MSGNr, [Head|Tail]) ->
+find_message_number(MSGNr, [Head | Tail]) ->
   [Head | find_message_number(MSGNr, Tail)].
 
 
