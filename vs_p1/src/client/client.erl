@@ -63,7 +63,8 @@ start() ->
   {Clients, Lifetime, Servername, Servernode, Sendinterval} = readConfig(),
   Range = lists:seq(1, Clients),
   lists:foreach(fun(X) ->
-    spawn(loop(Lifetime, Servername, Servernode, Sendinterval)) end, Range).
+
+    spawn(loop(Lifetime, Servername, Servernode, Sendinterval,X)) end, Range).
 
 
 % readConfig()
@@ -88,7 +89,9 @@ readConfig() ->
 
 
 
-loop(Lifetime, Servername, Servernode, Sendinterval) ->
+loop(Lifetime, Servername, Servernode, Sendinterval,NamePostfix) ->
+  % registriere den Prozess mit dem Erlang Prozess
+  erlang:register("ClientNr:" ++ NamePostfix, self()),
   loop(Lifetime, Servername, Servernode, Sendinterval, erlang:now(), 1, ?REDAKTEUR_ATOM,  false).
 
 

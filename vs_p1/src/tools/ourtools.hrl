@@ -7,6 +7,7 @@
 %%% Created : 06. Apr 2015 13:06
 %%%-------------------------------------------------------------------
 -author("Allquantor").
+-export([timestamp_to_millis/1]).
 
 -define(MAXIMAL_RESPONSE_TIME_BEFORE_ERROR, 5000).
 

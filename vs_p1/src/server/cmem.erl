@@ -9,7 +9,7 @@
 
 -module(cmem).
 -author("kbrusch").
--export([initCMEM/2, getClientNNr/2, updateClient/4, delExpiredCl/1, delExpiredCl/1]).
+-export([initCMEM/2, getClientNNr/2, updateClient/4, delExpiredCl/1]).
 -include("../tools/ourtools.hrl").
 
 % initCMEM(RemTime, Datei)
@@ -38,14 +38,6 @@ updateClient({Clientlifetime,CMEM}, ClientID, NNr, Datei) ->
   F = fun({_ClientID,_LastMessageNumer, _Time}) -> _ClientID =/= ClientID end,
   _NewCMEM = lists:filter(F,CMEM),
   _NewCMEM ++ {Clientlifetime,{ClientID,NNr,erlang:now()}}.
-
-
-
-
-
-
-
-
 
 
 % getClientNNr(CMEM, ClientID)

@@ -63,7 +63,9 @@ start() ->
   % CMEM initialisieren
   CMEM = cmem:initCMEM(Clientlifetime, ServerLogFile),
 
-  loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ServerLogFile).
+  TimeOfLastConnection = erlang:now(),
+
+  loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ServerLogFile, TimeOfLastConnection).
 
 
 %readConfig()
@@ -109,35 +111,69 @@ readConfig() ->
 %return: server terminated als Atom
 
 
-loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ServerLogFile) ->
+loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ServerLogFile, TimeOfLastConnection) ->
+
+  case timestamp_to_millis(erlang:now()) - timestamp_to_millis(TimeOfLastConnection) >= Latency of
+    true ->
+      CMEM = cmem:delExpiredCl(CMEM),
 
 
-  CMEM = cmem:delExpiredCl(CMEM),
+      %if
+      %  erlang:now() - timeOfLastConnection > erlang:now() ->
+      %    HBQ ! pushHBQ
 
+      receive
 
-  %if
-  %  erlang:now() - timeOfLastConnection > erlang:now() ->
-  %    HBQ ! pushHBQ
+        {dropmessage, [INNr, Msg, TSclientout]} ->
+          dropmessage(HBQname, HBQnode, [INNr, Msg, TSclientout]),
+          loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ServerLogFile, erlang:now())
+      ;
 
-  receive
+        {ClientPID, getmessages} ->
+          NewCMEM = sendMessages(ClientPID, CMEM, HBQname, HBQnode),
+          loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, NewCMEM, INNR, ServerLogFile, erlang:now())
+      ;
 
-    {dropmessage, [INNr, Msg, TSclientout]} ->
-      dropmessage(HBQname, HBQnode, [INNr, Msg, TSclientout]),
-      loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ServerLogFile)
-  ;
+        {ClientPID, getmsgid} ->
+          sendMSGID(ClientPID, INNR),
+          NewCMEM = cmem:updateClient(CMEM, ClientPID, INNR, ServerLogFile),
+          loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, NewCMEM, INNR + 1, ServerLogFile, erlang:now())
 
-    {ClientPID, getmessages} ->
-      NewCMEM = sendMessages(ClientPID, CMEM),
-      loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, NewCMEM, INNR, ServerLogFile)
-  ;
-
-    {ClientPID, getmsgid} ->
-      cmem:updateClient(CMEM, ClientPID, INNR, ServerLogFile),
-      ClientPID ! {nid, INNR},
-      loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR + 1, ServerLogFile)
-
-
+      end;
+    false ->
+      shutdownRoutine(HBQname,HBQnode)
   end.
+
+
+shutdownRoutine(HBQName,HBQNode) ->
+  {HBQName,HBQNode} ! self(),
+  receive
+    {reply,ok} ->
+      werkzeug:logging(?SERVER_LOGGING_FILE,"HBQ Terminated Correctly"),
+      werkzeug:logging(?SERVER_LOGGING_FILE,"Server Terminated Correctly"),
+      ok
+  after ?MAXIMAL_RESPONSE_TIME_BEFORE_ERROR ->
+    werkzeug:logging(?SERVER_LOGGING_FILE,"cant correct shutdown HBQ no answer try again"),
+    shutdownRoutine(HBQName,HBQNode)
+  end.
+
+
+
+% sendMSGID(ClientPID, CMEM)
+
+%% Definition: Der Server muss nun im Modul „cmem.erl“ die Methode „getClientNNr(CMEM,ClientID)“ aufrufen,
+%% damit dieser die aktuelle Nachrichtennummer erhalten kann.
+%% Der Server schickt dann die Nachricht {nid, Number} an die angegeben ClientPID.
+%% Number ist die empfangene Nachrichtennummer.
+
+%pre: korrekt übergebene Client PID
+%post: erfolgreiche Ermittlung einer neuen MSGID
+%return: Atom ok wird zurückgegeben
+
+sendMSGID(ClientPID, INNR) ->
+  %LastMessageId = cmem:getClientNNr(CMEM,ClientPID),
+  ClientPID ! {nid, INNR},
+  ok.
 
 
 %sendMessages(ToClient, CMEM)
@@ -159,16 +195,13 @@ loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR
 
 sendMessages(ToClient, CMEM, HBQname, HBQnode) ->
   NNr = cmem:getClientNNr(CMEM, ToClient),
-  {HBQname, HBQnode} ! {self(),{request,deliverMSG,NNr,ToClient}},
+  {HBQname, HBQnode} ! {self(), {request, deliverMSG, NNr, ToClient}},
   receive
-    {reply,SendNNr} ->
-      cmem:updateClient(CMEM,ToClient,SendNNr,?SERVER_LOGGING_FILE)
-      after ?MAXIMAL_RESPONSE_TIME_BEFORE_ERROR ->
-        werkzeug:logging(?SERVER_LOGGING_FILE, "sendMessages Failed")
+    {reply, SendNNr} ->
+      cmem:updateClient(CMEM, ToClient, SendNNr, ?SERVER_LOGGING_FILE)
+  after ?MAXIMAL_RESPONSE_TIME_BEFORE_ERROR ->
+    werkzeug:logging(?SERVER_LOGGING_FILE, "sendMessages Failed")
   end.
-
-
-
 
 
 %dropmessage(HBQname, HBQnode)
@@ -189,20 +222,9 @@ dropmessage(HBQname, HBQnode, [NNr, Msg, Tsclientout]) ->
   end.
 
 
-.
 
 
-% sendMSGID(ClientPID, CMEM)
 
-%% Definition: Der Server muss nun im Modul „cmem.erl“ die Methode „getClientNNr(CMEM,ClientID)“ aufrufen,
-%% damit dieser die aktuelle Nachrichtennummer erhalten kann.
-%% Der Server schickt dann die Nachricht {nid, Number} an die angegeben ClientPID.
-%% Number ist die empfangene Nachrichtennummer.
 
-%pre: korrekt übergebene Client PID
-%post: erfolgreiche Ermittlung einer neuen MSGID
-%return: Atom ok wird zurückgegeben
-
-sendMSGID(ClientPID, CMEM) -> ok.
 
 
