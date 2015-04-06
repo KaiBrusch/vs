@@ -67,23 +67,37 @@ push2DLQ([{NNr, Msg, TSclientout, TShbqin}], {Size, Queue}, Datei) ->
 % pre: die Queue ist in Form der DLQ-ADT (siehe initDLQ), sowie die ClientPID ist korrekt
 % post: eine MSGNr wurde zurückgegeben und die Queue um diese Nachricht verkleinert
 % return: die tatsächlich verschickte MSGNr als Integer-Wert an den HBQ-Prozess
-
+% DLQ = [{NNr, Msg, TSclientout, TShbqin, TSdlqin}..n]
 
 deliverMSG(MSGNr, ClientPID, {Size, Queue}, Datei) ->
-  {Highest, _, _, _, _, _}=lists:last(Queue),
-  case find_message_number(MSGNr, Queue, Highest) of
-    {Highest, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout} -> ClientPID ! {reply,{MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout},true};
-    {_, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout} -> ClientPID ! {reply,{MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout},false};
-    [] -> find_message_number(MSGNr+1, Queue, Highest)
-  end.
 
-find_message_number(MSGNr, [], _) ->
-  [];
+  ORDER = fun({NNr, Msg, TSclientout, TShbqin, TSdlqin},{_NNr, _Msg, _TSclientout, _TShbqin, _TSdlqin}) ->
+    NNr < _NNr end,
+  SortedQueue = lists:usort(ORDER,Queue),
+  Result = lists:findkey(MSGNr,1,SortedQueue),
+  {NNr, Msg, TSclientout, TShbqin, TSdlqin} = findMessage(SortedQueue,MSGNr,Result),
+  Exists = lists:any(fun({_NNr, _, _, _, _}) -> _NNr > NNr end,SortedQueue),
+  Tsdlqout = erlang:now(),
+  NewMessage = {reply,[NNr, Msg, TSclientout, TShbqin, TSdlqin,Tsdlqout],Exists},
+  ClientPID ! NewMessage.
 
-find_message_number(MSGNr, [{MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout} | Queue], _) ->
-  {MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout};
 
-find_message_number(MSGNr, [Head | Tail], Highest) ->
-  [Head | find_message_number(MSGNr, Tail, Highest)].
+
+
+%%hier kann passieren das wenn der client nach einer zu hohen nachricht fragt wie im nirvana landen
+%% todo beheben wenn zeit und bedarf und lust
+findMessage([],_, _) ->
+  {0, "DUMMY", "DUMMY", "DUMMY", "DUMMY"} ;
+
+findMessage(SortedQueue,MSGNr, false) ->
+  findMessage(SortedQueue,MSGNr +1,lists:findkey(MSGNr +1 ,1,SortedQueue));
+
+findMessage(_,_,{NNr, Msg, TSclientout, TShbqin, TSdlqin}) ->
+  {NNr, Msg, TSclientout, TShbqin, TSdlqin}.
+
+
+
+
+
 
 

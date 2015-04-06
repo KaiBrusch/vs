@@ -102,7 +102,9 @@ initHBQandDLQ(Size, ServerPID, HBQLoggerFile) ->
 
 pushHBQ(ServerPID, OldHBQ, [NNr, Msg, TSclientout]) ->
   ServerPID ! {reply, ok},
-  OldHBQ ++ [{NNr, Msg, TSclientout}].
+  NewHBQ = OldHBQ ++ [{NNr, Msg, TSclientout}],
+
+  q.
 
 
 % deliverMSG(ServerPID, DLQ, NNr, ToClient), erweitert fuer logging
@@ -145,7 +147,24 @@ dellHBQ(ServerPID, HBQname) ->
 %return: {HBQ, DLQ} als 2-Tupel
 
 
+sortDLQ({_,Queue}) ->
+  ORDER = fun({NNr, _, _, _, _},{_NNr, _, _, _, _}) ->
+    NNr < _NNr end,
+   ists:usort(ORDER,Queue).
+
+getAwaitDLQMessageNr([]) ->
+  1;
+getAwaitDLQMessageNr(SortedDLQ) ->
+  {NNr, _, _, _, _} = lists:last(SortedDLQ),
+  NNr +1.
+
+
+
+
 pushSeries(HBQ, {Size, Queue}) ->
+
+  AwaitNumber = getAwaitDLQMessageNr(sortDLQ({Size, Queue})),
+
 
   case two_thirds_reached(Size,HBQ) of
 
@@ -159,6 +178,10 @@ pushSeries(HBQ, {Size, Queue}) ->
 % pushSeries helper functions
 two_thirds_reached(HBQ, Size) ->
   erlang:len(HBQ) >= 2/3 * Size.
+
+
+
+
 
 push_consistent_block(Queue, [ {MessageNumber, _d, _e} | TailHBQ], Size, []) ->
   push_consistent_block(Queue++[{MessageNumber, _d, _e}], TailHBQ, Size , []++[MessageNumber]);
