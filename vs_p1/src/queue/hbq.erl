@@ -22,7 +22,7 @@
 
 start() ->
   % receive values from config
-  {ok, ConfigListe} = file:consult("../server.cfg"),
+  {ok, ConfigListe} = file:consult('../server.cfg'),
   {ok, HBQname} = werkzeug:get_config_value(hbqname, ConfigListe),
   {ok, DlqLimit} = werkzeug:get_config_value(dlqlimit, ConfigListe),
 
@@ -55,8 +55,8 @@ loop(DlqLimit, HBQname, HBQLoggerFile, HBQ, DLQ) ->
   receive
 
     {ServerPID, {request, initHBQ}} ->
-      {HBQ, DLQ} = initHBQandDLQ(DlqLimit, ServerPID, HBQLoggerFile)
-      , loop(DlqLimit, HBQname, HBQLoggerFile, HBQ, DLQ)
+      {_HBQ, _DLQ} = initHBQandDLQ(DlqLimit, ServerPID, HBQLoggerFile)
+      , loop(DlqLimit, HBQname, HBQLoggerFile, _HBQ, _DLQ)
   ;
     {ServerPID, {request, pushHBQ, [NNr, Msg, TSclientout]}} ->
       werkzeug:logging(HBQLoggerFile, 'gepusht')
