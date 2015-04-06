@@ -69,29 +69,10 @@ get_last_message_id(ClientID, CMEM) ->
 %return: Das Atom ok als Rückgabewert
 
 delExpiredCl({Clientlifetime, Queue}) ->
-  delExpiredHelper({Clientlifetime, Queue}, []).
-
-
-delExpiredHelper({Clientlifetime, []}, Akku) ->
-  {Clientlifetime, Akku};
-
-delExpiredHelper({RemTime, [{_Id, _LastMessage, Time} | TailQueue]}, Akku) ->
-  case expired(Time, RemTime) of
-
-    true -> delExpiredHelper({RemTime, TailQueue}, Akku ++ [{_Id, _LastMessage, Time}]);
-    false -> delExpiredHelper({RemTime, TailQueue}, Akku)
-  end;
-
-delExpiredHelper({Clientlifetime, [{_Id, _LastMessage, Time} | Queue]}, Akku) ->
-  case expired(Time, Clientlifetime) of
-    false -> delExpiredHelper({Clientlifetime, Queue}, Akku ++ [{_Id, _LastMessage, Time}]);
-    true -> delExpiredHelper({Clientlifetime, Queue}, Akku)
-  end.
-
-
-expired(Time, RemTime) ->
-  timestamp_to_millis(erlang:now()) - timestamp_to_millis(Time) >= timestamp_to_millis(RemTime).
-
+  Now = timestamp_to_millis(erlang:now()),
+  F = fun({_Id,_LastMessage,_Time}) -> (Now - timestamp_to_millis(_Time)) > timestamp_to_millis(Clientlifetime) end,
+  NewQueue = lists:filter(F,Queue),
+  NewQueue.
 
 
 
