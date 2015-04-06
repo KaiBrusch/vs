@@ -8,7 +8,7 @@
 %%%-------------------------------------------------------------------
 -module(hbq).
 -author("kbrusch").
--export([initHBQandDLQ/1,start/0]).
+-export([initHBQandDLQ/1, start/0]).
 
 
 %start()
@@ -22,21 +22,19 @@
 
 start() ->
   % receive values from config
-  {ok, ConfigListe}       = file:consult("../server.cfg"),
-  {ok, HBQname}           = werkzeug:get_config_value(hbqname, ConfigListe),
-  {ok, DlqLimit}           = werkzeug:get_config_value(dlqlimit, ConfigListe),
+  {ok, ConfigListe} = file:consult("../server.cfg"),
+  {ok, HBQname} = werkzeug:get_config_value(hbqname, ConfigListe),
+  {ok, DlqLimit} = werkzeug:get_config_value(dlqlimit, ConfigListe),
 
   % register this process
-  erlang:register(HBQname ,self()),
+  erlang:register(HBQname, self()),
 
   % init logger file
-  HBQLoggerFile= 'hbq.log',
+  HBQLoggerFile = 'hbq.log',
 
   % lifetime loop
-  loop(HBQLoggerFile,DlqLimit, _, _).
+  loop(HBQLoggerFile, DlqLimit, _, _).
 .
-
-
 
 
 % loop()
@@ -54,24 +52,27 @@ start() ->
 % post: der Prozess wurde erfolgreich terminiert
 % return: hbq-process terminated als Atom
 
-loop(DlqLimit,HBQLoggerFile,HBQ,DLQ) ->
+loop(DlqLimit, HBQname, HBQLoggerFile, HBQ, DLQ) ->
   receive
 
     {ServerPID, {request, initHBQ}} ->
-      {HBQ, DLQ}=initHBQandDLQ(DlqLimit, ServerPID, HBQLoggerFile)
-      , loop(DlqLimit,HBQLoggerFile, HBQ, DLQ)
+      {HBQ, DLQ} = initHBQandDLQ(DlqLimit, ServerPID, HBQLoggerFile)
+      , loop(DlqLimit, HBQname, HBQLoggerFile, HBQ, DLQ)
   ;
-    {ServerPID, {request,pushHBQ,[NNr,Msg,TSclientout]}} ->
+    {ServerPID, {request, pushHBQ, [NNr, Msg, TSclientout]}} ->
       werkzeug:logging(HBQLoggerFile, 'gepusht')
-      , pushHBQ(ServerPID, HBQ,[NNr,Msg,TSclientout])
-      , loop(DlqLimit,HBQLoggerFile, HBQ)
+      , pushHBQ(ServerPID, HBQ, [NNr, Msg, TSclientout])
+      , loop(DlqLimit, HBQname, HBQLoggerFile, HBQ)
   ;
-    {ServerPID, {request,deliverMSG,NNr,ToClient}} ->
+    {ServerPID, {request, deliverMSG, NNr, ToClient}} ->
       deliverMSG(ServerPID, DLQ, NNr, ToClient)
-      , loop(DlqLimit,HBQLoggerFile, HBQ)
+      , loop(DlqLimit, HBQname, HBQLoggerFile, HBQ)
+  ;
+    {ServerPID, {request, dellHBQ}} ->
+      dellHBQ(ServerPID, HBQname)
 
 
-end.
+  end.
 
 
 % initHBQandDLQ(ServerPID)
@@ -86,11 +87,9 @@ end.
 % return: 2-Tupel: {[], DLQ}
 
 initHBQandDLQ(Size, ServerPID, HBQLoggerFile) ->
-  ServerPID ! {reply, ok},
-  DLQ = dlq:initDLQ(Size,HBQLoggerFile),
-  {[], DLQ}.
-
-
+  DLQ = dlq:initDLQ(Size, HBQLoggerFile),
+  {[], DLQ},
+  ServerPID ! {reply, ok}.
 
 
 % pushHBQ(ServerPID, OldHBQ, [NNr, Msg, TSclientout])
@@ -104,8 +103,7 @@ initHBQandDLQ(Size, ServerPID, HBQLoggerFile) ->
 
 pushHBQ(ServerPID, OldHBQ, [NNr, Msg, TSclientout]) ->
   ServerPID ! {reply, ok},
-  OldHBQ++[{NNr, Msg, TSclientout}].
-
+  OldHBQ ++ [{NNr, Msg, TSclientout}].
 
 
 % deliverMSG(ServerPID, DLQ, NNr, ToClient)
@@ -119,10 +117,10 @@ pushHBQ(ServerPID, OldHBQ, [NNr, Msg, TSclientout]) ->
 %post: Der Client hat eine neue Nachricht erhalten, die DLQ ist um eine Nachricht kleiner geworden und der Server hat ein die tatsächlich gesendete Nachrichtennummer erhalten.
 %return: Atom ok wird zurückgegeben
 
-deliverMSG(ServerPID, DLQ, NNr, ToClient) ->
-
-  ToClient ! {}
-  {reply,ok}.
+deliverMSG(ServerPID, DLQ, NNr, ToClient, HBQLoggerfile) ->
+  {reply, {MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout}, Terminated} = dlq:deliverMSG(ServerPID, DLQ, NNr, HBQLoggerfile),
+  ToClient ! {reply, {MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout}, Terminated},
+  ServerPID ! {reply, MSGNr}.
 
 
 % dellHBQ(ServerPID)
@@ -132,10 +130,9 @@ deliverMSG(ServerPID, DLQ, NNr, ToClient) ->
 % post: der Prozess wurde erfolgreich beendet
 % return: Atom ok wird zurückgegeben
 
-dellHBQ(ServerPID) ->
-  % terminate this procces
+dellHBQ(ServerPID, HBQname) ->
+  erlang:unregister(HBQname),
   ServerPID ! {reply, ok}.
-
 
 
 % pushSeries(HBQ, DLQ)
@@ -148,13 +145,15 @@ dellHBQ(ServerPID) ->
 %post: veränderte HBQ- und DLQ-Datenstruktur
 %return: {HBQ, DLQ} als 2-Tupel
 
-pushSeries(HBQ, {Size, Queue}) ->
-  if
-    len(HBQ) == 2/3 * Size ->
-      ok;
-    len(HBQ) < 2/3 * Size ->
-      push_consisten(HBQ, Queue)
-  end.
+
+pushSeries(HBQ, {Size, Queue}) -> ok.
+
+%pushSeries(HBQ, {Size, Queue}) ->
+%  case two_thirds_reached(Size,Queue) of
+%   true -> compact_queue()
+%   false ->
+%  end.
 
 
 
+push_consistent(HBQ, Queue) ->

@@ -32,6 +32,7 @@ start() ->
   {Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit} = readConfig(),
 
   % Logifle fuer den Server log
+  % wo ist das file
   ServerLogFile = 'server.log',
 
   % registriere den Prozess mit dem Erlang Prozess
@@ -44,12 +45,11 @@ start() ->
   net_adm:ping(HBQnode),
 
   % HBQ und DLQ initialisieren
-  HBQname ! {self(), {request,initHBQ}},
-    receive {reply, Message} -> werkzeug:logging(ServerLogFile, Message) end,
+  %HBQname ! {self(), {request,initHBQ}},
+  %  receive {reply, Message} -> werkzeug:logging(ServerLogFile, Message) end,
 
   % CMEM initialisieren
   CMEM = cmem:initCMEM(Clientlifetime,ServerLogFile),
-
 
   loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ServerLogFile).
 
@@ -101,7 +101,7 @@ readConfig() ->
 loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ServerLogFile) ->
 
 
-  CMEM = cmen:delExpiredCL(CMEM),
+  CMEM = cmem:delExpiredCl(CMEM),
 
 
   %if
