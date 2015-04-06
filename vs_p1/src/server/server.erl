@@ -87,6 +87,8 @@ readConfig() ->
   {ok, DLQlimit} = werkzeug:get_config_value(dlqlimit, ConfigListe),
   {ok, HBQname} = werkzeug:get_config_value(hbqname, ConfigListe),
   {ok, HBQnode} = werkzeug:get_config_value(hbqnode, ConfigListe),
+  erlang:display(HBQname),
+  erlang:display(HBQnode),
 
 
   {Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit}.
