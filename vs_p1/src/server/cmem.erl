@@ -80,6 +80,7 @@ delExpiredHelper({RemTime, [{_Id, _LastMessage, Time} | TailQueue]}, Akku) ->
 
     true -> delExpiredHelper({RemTime, TailQueue}, Akku ++ [{_Id, _LastMessage, Time}]);
     false -> delExpiredHelper({RemTime, TailQueue}, Akku)
+  end;
 
 delExpiredHelper({Clientlifetime, [{_Id, _LastMessage, Time} | Queue]}, Akku) ->
   case expired(Time, Clientlifetime) of
