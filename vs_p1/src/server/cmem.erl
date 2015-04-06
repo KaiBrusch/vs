@@ -32,51 +32,20 @@ initCMEM(Clientlifetime, Datei) ->
 %post: neuer Client gespeichert, oder einen bereits vorhandenen Client aktualisiert
 %% return: aktualisiertes CMEM
 
-updateClient(CMEM, ClientID, NNr, Datei) ->
-
-  case exists(ClientID, CMEM) of
-
-    true -> update_last_message(ClientID, NNr, CMEM);
-    false -> create(ClientID, CMEM)
-
-  end.
-
-% Listhelper
-not_exists(ClientID, CMEM) ->
-  not exists(ClientID, CMEM).
-
-exists(_, []) ->
-  false;
-
-exists(ClientID, [{ClientID, _LastMessageNumber, _Time} | _Queue]) ->
-  true;
-
-exists(ClientID, [_ | _Queue]) ->
-  exists(ClientID, _Queue).
-
-create(ClientID, CMEM) ->
-  [{ClientID, 1, erlang:now()}] ++ CMEM.
 
 
-update_last_message(_, _, []) ->
-  [];
-
-update_last_message(ClientID, NNr, [{ClientID, _LastMessageNumber, Time} | _Queue]) ->
-  [{ClientID, NNr, Time} | _Queue];
-
-update_last_message(ClientID, NNr, [Head | Tail]) ->
-  [Head | set_last_message(ClientID, NNr, Tail)].
+updateClient({Clientlifetime,CMEM}, ClientID, NNr, Datei) ->
+  F = fun({_ClientID,_LastMessageNumer, _Time}) -> _ClientID =/= ClientID end,
+  _NewCMEM = lists:filter(F,CMEM),
+  _NewCMEM ++ {Clientlifetime,{ClientID,NNr,erlang:now()}}.
 
 
 
-update_time_for_client(_, _, []) ->
-  [];
 
-update_time_for_client(ClientID, CurrentTime, [{ClientID, LastMessageNumer, _Time} | Queue]) ->
-  [{ClientID, LastMessageNumer, CurrentTime} | Queue];
 
-update_time_for_client(ClientID, CurrentTime, [Head | Tail]) ->
-  [Head | update_time_for_client(ClientID, CurrentTime, Tail)].
+
+
+
 
 
 % getClientNNr(CMEM, ClientID)
@@ -90,9 +59,6 @@ update_time_for_client(ClientID, CurrentTime, [Head | Tail]) ->
 getClientNNr({RemTime, CMEMLIST}, ClientID) ->
   get_last_message_id(ClientID, CMEMLIST).
 
-
-getClientNNr({Clientlifetime, CMEM}, ClientID) ->
-  get_last_message_id(ClientID, CMEM).
 
 get_last_message_id(_, []) ->
   1;
