@@ -87,8 +87,8 @@ loop(DlqLimit, HBQname, HBQLoggerFile, HBQ, DLQ) ->
 
 initHBQandDLQ(Size, ServerPID, HBQLoggerFile) ->
   DLQ = dlq:initDLQ(Size, HBQLoggerFile),
-  {[], DLQ},
-  ServerPID ! {reply, ok}.
+  ServerPID ! {reply, ok},
+  {[], DLQ}.
 
 
 % pushHBQ(ServerPID, OldHBQ, [NNr, Msg, TSclientout])

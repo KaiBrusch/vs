@@ -26,6 +26,19 @@
 % post: Server ist gestartet und im lokalen Namensdienst von Erlang registriert
 % return: server started als Atom sonst eine sinnvolle Error-Meldung
 
+
+-define(SERVER_LOGGING_FILE, fun() -> werkzeug:message_to_string(erlang:date()) ++ "-ClientLog.txt" end).
+-include("../tools/ourtools.hrl").
+
+initHBQ(HBQname, HBQnode) ->
+  {HBQname, HBQnode} ! {self(), {request, initHBQ}},
+  receive
+    {reply, ok} ->
+      werkzeug:logging(?SERVER_LOGGING_FILE, "HBQ and DLQ was intialized")
+  after ?MAXIMAL_RESPONSE_TIME_BEFORE_ERROR ->
+    werkzeug:logging(?SERVER_LOGGING_FILE, "HBQ and DLQ was not initialzed ERROR!")
+  end.
+
 start() ->
 
   % lade die Parameter aus der Config Datei
@@ -36,7 +49,7 @@ start() ->
   ServerLogFile = 'server.log',
 
   % registriere den Prozess mit dem Erlang Prozess
-  erlang:register(Servername,self()),
+  erlang:register(Servername, self()),
 
   % Nachrichtennummer zum start
   INNR = 1,
@@ -45,14 +58,14 @@ start() ->
   net_adm:ping(HBQnode),
 
   % HBQ und DLQ initialisieren
-  %HBQname ! {self(), {request,initHBQ}},
-  %  receive {reply, Message} -> werkzeug:logging(ServerLogFile, Message) end,
+  initHBQ(HBQname, HBQnode),
 
   % CMEM initialisieren
-  CMEM = cmem:initCMEM(Clientlifetime,ServerLogFile),
+  CMEM = cmem:initCMEM(Clientlifetime, ServerLogFile),
 
-  loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ServerLogFile).
+  TimeOfLastConnection = erlang:now(),
 
+  loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ServerLogFile, TimeOfLastConnection).
 
 
 %readConfig()
@@ -67,16 +80,16 @@ start() ->
 
 readConfig() ->
 
-  {ok, ConfigListe}       = file:consult("../server.cfg"),
-  {ok, Latency}           = werkzeug:get_config_value(latency, ConfigListe),
-  {ok, Clientlifetime}    = werkzeug:get_config_value(clientlifetime, ConfigListe),
-  {ok, Servername}        = werkzeug:get_config_value(servername, ConfigListe),
-  {ok, DLQlimit}          = werkzeug:get_config_value(dlqlimit, ConfigListe),
-  {ok, HBQname}           = werkzeug:get_config_value(hbqname, ConfigListe),
-  {ok, HBQnode}           = werkzeug:get_config_value(hbqnode, ConfigListe),
+  {ok, ConfigListe} = file:consult("../server.cfg"),
+  {ok, Latency} = werkzeug:get_config_value(latency, ConfigListe),
+  {ok, Clientlifetime} = werkzeug:get_config_value(clientlifetime, ConfigListe),
+  {ok, Servername} = werkzeug:get_config_value(servername, ConfigListe),
+  {ok, DLQlimit} = werkzeug:get_config_value(dlqlimit, ConfigListe),
+  {ok, HBQname} = werkzeug:get_config_value(hbqname, ConfigListe),
+  {ok, HBQnode} = werkzeug:get_config_value(hbqnode, ConfigListe),
 
 
-   {Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit}.
+  {Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit}.
 
 
 %loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit)
@@ -98,66 +111,51 @@ readConfig() ->
 %return: server terminated als Atom
 
 
-loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ServerLogFile) ->
+loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ServerLogFile, TimeOfLastConnection) ->
+
+  case timestamp_to_millis(erlang:now()) - timestamp_to_millis(TimeOfLastConnection) >= Latency of
+    true ->
+      CMEM = cmem:delExpiredCl(CMEM),
 
 
-  CMEM = cmem:delExpiredCl(CMEM),
+      %if
+      %  erlang:now() - timeOfLastConnection > erlang:now() ->
+      %    HBQ ! pushHBQ
 
+      receive
 
-  %if
-  %  erlang:now() - timeOfLastConnection > erlang:now() ->
-  %    HBQ ! pushHBQ
-
-  receive
-
-      {dropmessage,[INNr, Msg, TSclientout]} ->
-        dropmessage(HBQname, HBQnode),
-        loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ServerLogFile)
+        {dropmessage, [INNr, Msg, TSclientout]} ->
+          dropmessage(HBQname, HBQnode, [INNr, Msg, TSclientout]),
+          loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ServerLogFile, erlang:now())
       ;
 
-      {ClientPID, getmessages} ->
-        cmem:getClientNNr(CMEM, ClientPID),
-        sendMessages(ClientPID,CMEM),
-        loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ServerLogFile)
+        {ClientPID, getmessages} ->
+          NewCMEM = sendMessages(ClientPID, CMEM, HBQname, HBQnode),
+          loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, NewCMEM, INNR, ServerLogFile, erlang:now())
       ;
 
-      {ClientPID, getmsgid} ->
-        cmem:updateClient(CMEM,ClientPID,INNR,ServerLogFile),
-        ClientPID ! {nid, INNR},
-        loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR+1, ServerLogFile)
+        {ClientPID, getmsgid} ->
+          sendMSGID(ClientPID, INNR),
+          NewCMEM = cmem:updateClient(CMEM, ClientPID, INNR, ServerLogFile),
+          loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, NewCMEM, INNR + 1, ServerLogFile, erlang:now())
 
-
-
-
+      end;
+    false ->
+      shutdownRoutine(HBQname,HBQnode)
   end.
 
 
-%sendMessages(ToClient, CMEM)
-
-%% Definition: In dieser Methode muss der Server zuerst die korrekte Nachrichtennummer aus dem CMEM holen.
-%% Er ruft die Methode „getClientNNr(CMEM, ClientID)“ aus dem Modul „cmem.erl“ auf um diese zu bekommen.
-%% Die Parameter „ToClient“ und „ClientID“ sind identisch.
-%% Im Anschluss sendet der Server eine Nachricht an den HBQ-Prozess: {self(), {request,deliverMSG,NNr,ToClient}} Hiermit wird der HBQ-Prozess aufgefordert Nachrichten an den Client („ToClient“) zu senden.
-%% Der Server wartet auf die Antwort der HBQ: {reply, SendNNr}.
-%% Sobald er diese SendNNr hat, muss der Server ebenfalls den CMEM-Eintrag des jeweiligen Clients anpassen und ruft die Methode „updateClient(CMEM, ClientID, NNR, Datei)“ aus dem Modul „cmem.erl“ auf.
-
-% pre: korrekt übergebene Client PID
-% post: die Nachrichten wurden erfolgreich aus der DLQ geholt und an Client gesendet
-% return: Atom ok wird zurückgegeben
-
-sendMessages(ToClient, CMEM) -> ok.
-
-
-%dropmessage(HBQname, HBQnode)
-
-%% Definition: Der Server sendet folgende Nachricht an den HBQ-Prozess: {self(), {request,pushHBQ, [NNr,Msg,TSclientout]}}.
-%% Somit wird der HBQ-Prozess aufgefordert eine Nachricht zu sichern.
-%% Der Server wartet auf Antwort der HBQ und erwartet folgende Nachricht: {reply, ok}.
-
-%pre: HBQ-Prozess vorhanden und mit übergebenen Parametern ansprechbar
-%post: erreichte Nachricht vom Client wurde erfolgreich in die HBQ eingetragen return: Atom ok wird zurückgegeben
-
-dropmessage(HBQname, HBQnode) -> ok.
+shutdownRoutine(HBQName,HBQNode) ->
+  {HBQName,HBQNode} ! self(),
+  receive
+    {reply,ok} ->
+      werkzeug:logging(?SERVER_LOGGING_FILE,"HBQ Terminated Correctly"),
+      werkzeug:logging(?SERVER_LOGGING_FILE,"Server Terminated Correctly"),
+      ok
+  after ?MAXIMAL_RESPONSE_TIME_BEFORE_ERROR ->
+    werkzeug:logging(?SERVER_LOGGING_FILE,"cant correct shutdown HBQ no answer try again"),
+    shutdownRoutine(HBQName,HBQNode)
+  end.
 
 
 
@@ -172,6 +170,61 @@ dropmessage(HBQname, HBQnode) -> ok.
 %post: erfolgreiche Ermittlung einer neuen MSGID
 %return: Atom ok wird zurückgegeben
 
-sendMSGID(ClientPID, CMEM) -> ok.
+sendMSGID(ClientPID, INNR) ->
+  %LastMessageId = cmem:getClientNNr(CMEM,ClientPID),
+  ClientPID ! {nid, INNR},
+  ok.
+
+
+%sendMessages(ToClient, CMEM)
+
+%% Definition: In dieser Methode muss der Server zuerst die korrekte Nachrichtennummer aus dem CMEM holen.
+%% Er ruft die Methode „getClientNNr(CMEM, ClientID)“ aus dem Modul „cmem.erl“ auf um diese zu bekommen.
+%% Die Parameter „ToClient“ und „ClientID“ sind identisch.
+%% Im Anschluss sendet der Server eine Nachricht an den HBQ-Prozess: {self(), {request,deliverMSG,NNr,ToClient}} Hiermit wird der HBQ-Prozess aufgefordert Nachrichten an den Client („ToClient“) zu senden.
+%% Der Server wartet auf die Antwort der HBQ: {reply, SendNNr}.
+%% Sobald er diese SendNNr hat, muss der Server ebenfalls den CMEM-Eintrag des jeweiligen Clients anpassen und ruft die Methode „updateClient(CMEM, ClientID, NNR, Datei)“ aus dem Modul „cmem.erl“ auf.
+
+
+% pre: korrekt übergebene Client PID
+% post: die Nachrichten wurden erfolgreich aus der DLQ geholt und an Client gesendet
+% return: Atom ok wird zurückgegeben
+
+% Wir haben es Erweitert, es wird die veränderte CMEM wiedergegeben
+% außerdem kommen für den Prozess nötige Argumente hinzu
+
+sendMessages(ToClient, CMEM, HBQname, HBQnode) ->
+  NNr = cmem:getClientNNr(CMEM, ToClient),
+  {HBQname, HBQnode} ! {self(), {request, deliverMSG, NNr, ToClient}},
+  receive
+    {reply, SendNNr} ->
+      cmem:updateClient(CMEM, ToClient, SendNNr, ?SERVER_LOGGING_FILE)
+  after ?MAXIMAL_RESPONSE_TIME_BEFORE_ERROR ->
+    werkzeug:logging(?SERVER_LOGGING_FILE, "sendMessages Failed")
+  end.
+
+
+%dropmessage(HBQname, HBQnode)
+
+%% Definition: Der Server sendet folgende Nachricht an den HBQ-Prozess: {self(), {request,pushHBQ, [NNr,Msg,TSclientout]}}.
+%% Somit wird der HBQ-Prozess aufgefordert eine Nachricht zu sichern.
+%% Der Server wartet auf Antwort der HBQ und erwartet folgende Nachricht: {reply, ok}.
+
+%pre: HBQ-Prozess vorhanden und mit übergebenen Parametern ansprechbar
+%post: erreichte Nachricht vom Client wurde erfolgreich in die HBQ eingetragen return: Atom ok wird zurückgegeben
+
+dropmessage(HBQname, HBQnode, [NNr, Msg, Tsclientout]) ->
+  {HBQname, HBQnode} ! {self(), {request, pushHBQ, [NNr, Msg, Tsclientout]}},
+  receive
+    {reply, ok} -> ok
+  after ?MAXIMAL_RESPONSE_TIME_BEFORE_ERROR ->
+    werkzeug:logging(?SERVER_LOGGING_FILE, "dropmessage for msg:" ++ Msg ++ " Failed")
+  end.
+
+
+
+
+
+
 
 

@@ -9,7 +9,8 @@
 
 -module(cmem).
 -author("kbrusch").
--export([initCMEM/2, getClientNNr/2, updateClient/4, delExpiredCl/1, delExpiredCl/1]).
+-export([initCMEM/2, getClientNNr/2, updateClient/4, delExpiredCl/1]).
+-include("../tools/ourtools.hrl").
 
 % initCMEM(RemTime, Datei)
 
@@ -19,8 +20,8 @@
 % post: neues 2-Tupel erstellt
 % return: {RemTime, []} - 2-Tupel mit RemTime als erstes Element und eine leere CMEM-Liste als 2. Element
 
-initCMEM(RemTime, Datei) ->
-  {RemTime, []}.
+initCMEM(Clientlifetime, Datei) ->
+  {Clientlifetime, []}.
 
 
 % updateClient(CMEM, ClientID, NNr, Datei)
@@ -31,51 +32,12 @@ initCMEM(RemTime, Datei) ->
 %post: neuer Client gespeichert, oder einen bereits vorhandenen Client aktualisiert
 %% return: aktualisiertes CMEM
 
-updateClient(CMEM, ClientID, NNr, Datei) ->
-
-  case exists(ClientID, CMEM) of
-
-    true -> update_last_message(ClientID, NNr, CMEM);
-    false -> create(ClientID, CMEM)
-
-  end.
-
-% Listhelper
-not_exists(ClientID, CMEM) ->
-  not exists(ClientID, CMEM).
-
-exists(_, []) ->
-  false;
-
-exists(ClientID, [{ClientID, _LastMessageNumber, _Time} | _Queue]) ->
-  true;
-
-exists(ClientID, [_ | _Queue]) ->
-  exists(ClientID, _Queue).
-
-create(ClientID, CMEM) ->
-  [{ClientID, 1, erlang:now()}] ++ CMEM.
 
 
-update_last_message(_, _, []) ->
-  [];
-
-update_last_message(ClientID, NNr, [{ClientID, _LastMessageNumber, Time} | _Queue]) ->
-  [{ClientID, NNr, Time} | _Queue];
-
-update_last_message(ClientID, NNr, [Head | Tail]) ->
-  [Head | set_last_message(ClientID, NNr, Tail)].
-
-
-
-update_time_for_client(_, _, []) ->
-  [];
-
-update_time_for_client(ClientID, CurrentTime, [{ClientID, LastMessageNumer, _Time} | Queue]) ->
-  [{ClientID, LastMessageNumer, CurrentTime} | Queue];
-
-update_time_for_client(ClientID, CurrentTime, [Head | Tail]) ->
-  [Head | update_time_for_client(ClientID, CurrentTime, Tail)].
+updateClient({Clientlifetime,CMEM}, ClientID, NNr, Datei) ->
+  F = fun({_ClientID,_LastMessageNumer, _Time}) -> _ClientID =/= ClientID end,
+  _NewCMEM = lists:filter(F,CMEM),
+  _NewCMEM ++ {Clientlifetime,{ClientID,NNr,erlang:now()}}.
 
 
 % getClientNNr(CMEM, ClientID)
@@ -89,14 +51,13 @@ update_time_for_client(ClientID, CurrentTime, [Head | Tail]) ->
 getClientNNr({RemTime, CMEMLIST}, ClientID) ->
   get_last_message_id(ClientID, CMEMLIST).
 
+
 get_last_message_id(_, []) ->
   1;
 
-get_last_message_id(ClientID, [{ClientID, Last_message_id, _Time} | Queue]) ->
-  Last_message_id;
-
-get_last_message_id(ClientID, [_ | Queue]) ->
-  get_last_message_id(ClientID, Queue).
+get_last_message_id(ClientID, CMEM) ->
+  {ClientID, Last_message_id, _Time} = lists:keyfind(ClientID, 1, CMEM),
+  Last_message_id.
 
 
 % delExpiredCl(CMEM, Clientlifetime)
@@ -107,22 +68,30 @@ get_last_message_id(ClientID, [_ | Queue]) ->
 %post: veränderte CMEM
 %return: Das Atom ok als Rückgabewert
 
-delExpiredCl({RemTime, Queue}) ->
-  delExpiredHelper({RemTime, Queue}, []).
+delExpiredCl({Clientlifetime, Queue}) ->
+  delExpiredHelper({Clientlifetime, Queue}, []).
 
 
-delExpiredHelper({RemTime, []}, Akku) ->
-  {RemTime, Akku};
+delExpiredHelper({Clientlifetime, []}, Akku) ->
+  {Clientlifetime, Akku};
 
 delExpiredHelper({RemTime, [{_Id, _LastMessage, Time} | TailQueue]}, Akku) ->
   case expired(Time, RemTime) of
 
     true -> delExpiredHelper({RemTime, TailQueue}, Akku ++ [{_Id, _LastMessage, Time}]);
     false -> delExpiredHelper({RemTime, TailQueue}, Akku)
+  end;
 
+delExpiredHelper({Clientlifetime, [{_Id, _LastMessage, Time} | Queue]}, Akku) ->
+  case expired(Time, Clientlifetime) of
+    false -> delExpiredHelper({Clientlifetime, Queue}, Akku ++ [{_Id, _LastMessage, Time}]);
+    true -> delExpiredHelper({Clientlifetime, Queue}, Akku)
   end.
 
 
 expired(Time, RemTime) ->
-  erlang:now() - Time > RemTime.
+  timestamp_to_millis(erlang:now()) - timestamp_to_millis(Time) >= timestamp_to_millis(RemTime).
+
+
+
 
