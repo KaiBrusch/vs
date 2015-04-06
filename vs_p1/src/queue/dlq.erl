@@ -31,10 +31,10 @@ initDLQ(Size, Datei) ->
 % return: nächste Nachrichtennummer die verwendet werden kann, sonst 1 bei leerer Liste
 
 expectedNr({Size, []}) ->
-  1.
+  1;
 
 expectedNr({Size, Queue}) ->
-  get_next_message_numer(last(Queue)).
+  get_next_message_numer(lists:last(Queue)).
 
 get_next_message_numer([NNr, Msg, TSclientout, TShbqin]) -> NNr + 1.
 
@@ -49,14 +49,10 @@ get_next_message_numer([NNr, Msg, TSclientout, TShbqin]) -> NNr + 1.
 
 
 push2DLQ([{NNr, Msg, TSclientout, TShbqin}], {Size, Queue}, Datei) ->
-  if
-    len(Queue) == Size ->
-      werkzeug:logging('dlq full', Datei),
-      {dlq_full};
 
-    len(Queue) < Size ->
-      werkzeug:logging('added to dlq', Datei),
-      {Size, Queue ++ [{NNr, Msg, TSclientout, erlang:now()}]}
+  case lists:length(Queue) < Size of
+      true -> werkzeug:logging('dlq full', Datei), {dlq_full};
+      false -> werkzeug:logging('added to dlq', Datei), {Size, Queue ++ [{NNr, Msg, TSclientout, erlang:now()}]}
   end.
 
 
@@ -75,19 +71,19 @@ push2DLQ([{NNr, Msg, TSclientout, TShbqin}], {Size, Queue}, Datei) ->
 
 deliverMSG(MSGNr, ClientPID, {Size, Queue}, Datei) ->
   {Highest, _, _, _, _, _}=lists:last(Queue),
-  case find_message_numer(MSGNr, Queue, Highest) of
+  case find_message_number(MSGNr, Queue, Highest) of
     {Highest, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout} -> ClientPID ! {reply,{MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout},true};
     {_, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout} -> ClientPID ! {reply,{MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout},false};
-    [] -> find_message_numer(MSGNr+1, Queue)
+    [] -> find_message_number(MSGNr+1, Queue, Highest)
   end.
 
-find_message_number(MSGNr, []) ->
+find_message_number(MSGNr, [], _) ->
   [];
 
-find_message_number(MSGNr, [{MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout} | Queue]) ->
+find_message_number(MSGNr, [{MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout} | Queue], _) ->
   {MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout};
 
-find_message_number(MSGNr, [Head | Tail]) ->
-  [Head | find_message_number(MSGNr, Tail)].
+find_message_number(MSGNr, [Head | Tail], Highest) ->
+  [Head | find_message_number(MSGNr, Tail, Highest)].
 
 

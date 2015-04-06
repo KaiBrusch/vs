@@ -150,6 +150,7 @@ pushSeries(HBQ, {Size, Queue}) ->
   case two_thirds_reached(Size,HBQ) of
 
     false -> push_consistent_block(Queue, HBQ, Size, []);
+
     true -> compact_and_push(Queue,HBQ,Size, [])
 
   end.
@@ -174,7 +175,7 @@ push_consistent_block(Queue, [ {MessageNumber, _d, _e} | TailQueue], Size,LastMe
 compact_and_push(Queue, [ {MessageNumber, _d, _e} | TailHBQ], Size, []) ->
   compact_and_push(Queue++[{MessageNumber, _d, _e}], TailHBQ, Size , []++[MessageNumber]);
 
-% todo:compat_and_push(HBQ, DLQ) how to get next message? oO
+% todo:compact_and_push(HBQ, DLQ) how to get next message? oO
 compact_and_push(Queue, [ {MessageNumber, _d, _e} | TailHBQ], Size, LastMessageNumberList) ->
   case MessageNumber == lists:last(LastMessageNumberList)+1 of
 
