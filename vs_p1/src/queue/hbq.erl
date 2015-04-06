@@ -54,21 +54,24 @@ start() ->
 % post: der Prozess wurde erfolgreich terminiert
 % return: hbq-process terminated als Atom
 
-loop(DlqLimit,HBQLoggerFile,HBQ,DLQ) ->
+loop(DlqLimit,HBQname,HBQLoggerFile,HBQ,DLQ) ->
   receive
 
     {ServerPID, {request, initHBQ}} ->
       {HBQ, DLQ}=initHBQandDLQ(DlqLimit, ServerPID, HBQLoggerFile)
-      , loop(DlqLimit,HBQLoggerFile, HBQ, DLQ)
+      , loop(DlqLimit,HBQname,HBQLoggerFile, HBQ, DLQ)
   ;
     {ServerPID, {request,pushHBQ,[NNr,Msg,TSclientout]}} ->
       werkzeug:logging(HBQLoggerFile, 'gepusht')
       , pushHBQ(ServerPID, HBQ,[NNr,Msg,TSclientout])
-      , loop(DlqLimit,HBQLoggerFile, HBQ)
+      , loop(DlqLimit,HBQname,HBQLoggerFile, HBQ)
   ;
     {ServerPID, {request,deliverMSG,NNr,ToClient}} ->
       deliverMSG(ServerPID, DLQ, NNr, ToClient)
-      , loop(DlqLimit,HBQLoggerFile, HBQ)
+      , loop(DlqLimit,HBQname,HBQLoggerFile, HBQ)
+  ;
+    {ServerPID, {request,dellHBQ}} ->
+    dellHBQ(ServerPID, HBQname)
 
 
 end.
@@ -132,8 +135,8 @@ deliverMSG(ServerPID, DLQ, NNr, ToClient) ->
 % post: der Prozess wurde erfolgreich beendet
 % return: Atom ok wird zurückgegeben
 
-dellHBQ(ServerPID) ->
-  % terminate this procces
+dellHBQ(ServerPID,HBQname) ->
+  erlang:unregister(HBQname),
   ServerPID ! {reply, ok}.
 
 
