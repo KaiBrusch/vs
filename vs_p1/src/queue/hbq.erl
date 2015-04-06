@@ -134,7 +134,7 @@ dellHBQ(ServerPID, HBQname) ->
   ServerPID ! {reply, ok}.
 
 
-% todo:pushSeries(HBQ, DLQ)
+
 
 %%Definition: Prüft auf Nachrichten / Nachrichtenfolgen, die ohne eine Lücke zu bilden in die DLQ eingefügt werden können.
 %%Prüft außerdem, ob die Anzahl der Nachrichten, die in der HBQ sind, 2/3 der Anzahl beträgt die in die DLQ passen.
@@ -174,7 +174,7 @@ push_consistent_block(Queue, [ {MessageNumber, _d, _e} | TailQueue], Size,LastMe
 compact_and_push(Queue, [ {MessageNumber, _d, _e} | TailHBQ], Size, []) ->
   compact_and_push(Queue++[{MessageNumber, _d, _e}], TailHBQ, Size , []++[MessageNumber]);
 
-
+% todo:compat_and_push(HBQ, DLQ) how to get next message? oO
 compact_and_push(Queue, [ {MessageNumber, _d, _e} | TailHBQ], Size, LastMessageNumberList) ->
   case MessageNumber == lists:last(LastMessageNumberList)+1 of
 
