@@ -9,7 +9,7 @@
 
 -module(cmem).
 -author("kbrusch").
--export([initCMEM/2, getClientNNr/2, updateClient/4, delExpiredCl/1,delExpiredCl/1]).
+-export([initCMEM/2, getClientNNr/2, updateClient/4, delExpiredCl/1, delExpiredCl/1]).
 
 % initCMEM(RemTime, Datei)
 
@@ -33,10 +33,11 @@ initCMEM(RemTime, Datei) ->
 
 updateClient(CMEM, ClientID, NNr, Datei) ->
 
-  case
-  exists(ClientID, CMEM) of
+  case exists(ClientID, CMEM) of
+
     true -> update_last_message(ClientID, NNr, CMEM);
     false -> create(ClientID, CMEM)
+
   end.
 
 % Listhelper
@@ -76,9 +77,6 @@ update_time_for_client(ClientID, CurrentTime, [{ClientID, LastMessageNumer, _Tim
 update_time_for_client(ClientID, CurrentTime, [Head | Tail]) ->
   [Head | update_time_for_client(ClientID, CurrentTime, Tail)].
 
-set_last_message(CLientId, NNr, Tail) ->
-  ok.
-
 
 % getClientNNr(CMEM, ClientID)
 
@@ -88,8 +86,8 @@ set_last_message(CLientId, NNr, Tail) ->
 % post: nicht veränderte CMEM, da nur lesend
 % return: ClientID als Integer-Wert, wenn nicht vorhanden wird 1 zurückgegeben
 
-getClientNNr(CMEM, ClientID) ->
-  get_last_message_id(ClientID, CMEM).
+getClientNNr({RemTime, CMEMLIST}, ClientID) ->
+  get_last_message_id(ClientID, CMEMLIST).
 
 get_last_message_id(_, []) ->
   1;
@@ -116,10 +114,12 @@ delExpiredCl({RemTime, Queue}) ->
 delExpiredHelper({RemTime, []}, Akku) ->
   {RemTime, Akku};
 
-delExpiredHelper({RemTime, [{_Id, _LastMessage, Time} | Queue]}, Akku) ->
+delExpiredHelper({RemTime, [{_Id, _LastMessage, Time} | TailQueue]}, Akku) ->
   case expired(Time, RemTime) of
-    true -> delExpiredHelper({RemTime, Queue}, Akku ++ [{_Id, _LastMessage, Time}]);
-    false -> delExpiredHelper({RemTime, Queue}, Akku)
+
+    true -> delExpiredHelper({RemTime, TailQueue}, Akku ++ [{_Id, _LastMessage, Time}]);
+    false -> delExpiredHelper({RemTime, TailQueue}, Akku)
+
   end.
 
 
