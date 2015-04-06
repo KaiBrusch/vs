@@ -74,8 +74,12 @@ push2DLQ([{NNr, Msg, TSclientout, TShbqin}], {Size, Queue}, Datei) ->
 
 
 deliverMSG(MSGNr, ClientPID, {Size, Queue}, Datei) ->
-  find_message_numer(MSGNr, Queue).
-% antwort nachricht bauen etc, und gucken ob es die letzte Nachricht ist
+  {Highest, _, _, _, _, _}=lists:last(Queue),
+  case find_message_numer(MSGNr, Queue, Highest) of
+    {Highest, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout} -> ClientPID ! {reply,{MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout},true};
+    {_, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout} -> ClientPID ! {reply,{MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout},false};
+    [] -> find_message_numer(MSGNr+1, Queue)
+  end.
 
 find_message_number(MSGNr, []) ->
   [];
