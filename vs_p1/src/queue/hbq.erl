@@ -8,7 +8,7 @@
 %%%-------------------------------------------------------------------
 -module(hbq).
 -author("kbrusch").
--export([initHBQandDLQ/1, start/0]).
+-export([initHBQandDLQ/3, start/0]).
 
 
 %start()
@@ -33,8 +33,7 @@ start() ->
   HBQLoggerFile = 'hbq.log',
 
   % lifetime loop
-  loop(HBQLoggerFile, DlqLimit, _, _).
-.
+  loop(DlqLimit,HBQname,HBQLoggerFile, [], []).
 
 
 % loop()
@@ -62,11 +61,11 @@ loop(DlqLimit, HBQname, HBQLoggerFile, HBQ, DLQ) ->
     {ServerPID, {request, pushHBQ, [NNr, Msg, TSclientout]}} ->
       werkzeug:logging(HBQLoggerFile, 'gepusht')
       , pushHBQ(ServerPID, HBQ, [NNr, Msg, TSclientout])
-      , loop(DlqLimit, HBQname, HBQLoggerFile, HBQ)
+      , loop(DlqLimit, HBQname, HBQLoggerFile, HBQ, DLQ)
   ;
     {ServerPID, {request, deliverMSG, NNr, ToClient}} ->
-      deliverMSG(ServerPID, DLQ, NNr, ToClient)
-      , loop(DlqLimit, HBQname, HBQLoggerFile, HBQ)
+      deliverMSG(ServerPID, DLQ, NNr, ToClient,HBQLoggerFile)
+      , loop(DlqLimit, HBQname, HBQLoggerFile, HBQ, DLQ)
   ;
     {ServerPID, {request, dellHBQ}} ->
       dellHBQ(ServerPID, HBQname)
@@ -106,7 +105,7 @@ pushHBQ(ServerPID, OldHBQ, [NNr, Msg, TSclientout]) ->
   OldHBQ ++ [{NNr, Msg, TSclientout}].
 
 
-% deliverMSG(ServerPID, DLQ, NNr, ToClient)
+% deliverMSG(ServerPID, DLQ, NNr, ToClient), erweitert fuer logging
 
 %% Definition: Beauftragt die DLQ die Nachricht mit geforderter NNr an den Client (ToClient) zu senden.
 %% Sie ruft intern die Methode „deliverMSG(MSGNr, ClientPID, Queue, Datei)“ aus dem Modul „dlq.erl“ auf.
@@ -135,7 +134,7 @@ dellHBQ(ServerPID, HBQname) ->
   ServerPID ! {reply, ok}.
 
 
-% pushSeries(HBQ, DLQ)
+% todo:pushSeries(HBQ, DLQ)
 
 %%Definition: Prüft auf Nachrichten / Nachrichtenfolgen, die ohne eine Lücke zu bilden in die DLQ eingefügt werden können.
 %%Prüft außerdem, ob die Anzahl der Nachrichten, die in der HBQ sind, 2/3 der Anzahl beträgt die in die DLQ passen.
@@ -146,14 +145,44 @@ dellHBQ(ServerPID, HBQname) ->
 %return: {HBQ, DLQ} als 2-Tupel
 
 
-pushSeries(HBQ, {Size, Queue}) -> ok.
+pushSeries(HBQ, {Size, Queue}) ->
 
-%pushSeries(HBQ, {Size, Queue}) ->
-%  case two_thirds_reached(Size,Queue) of
-%   true -> compact_queue()
-%   false ->
-%  end.
+  case two_thirds_reached(Size,HBQ) of
+
+    false -> push_consistent_block(Queue, HBQ, Size, []);
+
+    true -> compact_and_push(Queue,HBQ,Size, [])
+
+  end.
 
 
+% pushSeries helper functions
 
-push_consistent(HBQ, Queue) ->
+
+two_thirds_reached(HBQ, Size) ->
+  erlang:len(HBQ) >= 2/3 * Size.
+
+
+compact_and_push(Queue, [ {MessageNumber, _d, _e} | TailHBQ], Size, []) ->
+  compact_and_push(Queue++[{MessageNumber, _d, _e}], TailHBQ, Size , []++[MessageNumber]);
+
+compact_and_push(Queue, [ {MessageNumber, _d, _e} | TailHBQ], Size, [[LastMessageNumber]]) ->
+  case MessageNumber == lists:last(LastMessageNumber)+1 of
+
+    true  -> compact_and_push(Queue++[{MessageNumber, _d, _e}], [TailHBQ], Size, []++[MessageNumber]);
+    false -> {Size,Queue++[{lists:last(LastMessageNumber)+1,'ErrorUser','ErrorMessage'}]}++'NEXT MESSAGE'
+    %{[{NextNumber,NextTime,NextUser} | TailHBQ]
+
+  end.
+
+push_consistent_block(Queue, [ {MessageNumber, _d, _e} | TailHBQ], Size, []) ->
+  push_consistent_block(Queue++[{MessageNumber, _d, _e}], TailHBQ, Size , []++[MessageNumber]);
+
+push_consistent_block(Queue, [ {MessageNumber, _d, _e} | TailQueue], Size,[LastMessageNumber]) ->
+
+  case MessageNumber == lists:last(LastMessageNumber)+1 of
+
+    true  -> push_consistent_block(Queue++[{MessageNumber, _d, _e}], TailQueue, Size, []++[MessageNumber]);
+    false -> {[ {MessageNumber, _d, _e} | TailQueue],{Size,Queue}}
+
+  end.
