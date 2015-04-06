@@ -8,6 +8,14 @@
 %%%-------------------------------------------------------------------
 -module(make_script).
 -author("kbrusch").
+-export([make/0]).
 
-%% API
--export([]).
+
+make() ->
+
+    c('tools/werkzeug.erl'), c('server/server.erl'), c('server/cmem.erl'), c('queue/hbq.erl'), c('queue/dlq.erl'), c('client/client.erl').
+
+
+net_adm:ping('dieHBQ@Allquantor.fritz.box').
+
+{'dieHBQ', 'dieHBQ@Allquantor.fritz.box'} ! {self(), {request,initHBQ}}.

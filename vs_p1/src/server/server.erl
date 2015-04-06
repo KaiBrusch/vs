@@ -115,7 +115,7 @@ readConfig() ->
 
 loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ServerLogFile, TimeOfLastConnection) ->
 
-  case timestamp_to_millis(erlang:now()) - timestamp_to_millis(TimeOfLastConnection) >= Latency of
+  case timestamp_to_millis(erlang:now()) - timestamp_to_millis(TimeOfLastConnection) < Latency * 1000 of
     true ->
       CMEM = cmem:delExpiredCl(CMEM),
 
