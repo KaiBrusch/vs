@@ -21,9 +21,6 @@
 -define(LESER_ATOM, leser).
 -define(RECHNER_NAME, 'rechner@123').
 
--include("../tools/werkzeug.erl").
-
-
 
 
 
@@ -31,8 +28,11 @@ timestamp_to_millis({MegaSecs, Secs, MicroSecs}) ->
   (MegaSecs * 1000000 + Secs) * 1000 + round(MicroSecs / 1000).
 
 
+is_time_over(0, Lifetime) ->
+  true;
 is_time_over(Start, Lifetime) ->
-  (timestamp_to_millis(erlang:now()) - timestamp_to_millis(Start)) >= Lifetime.
+  (timestamp_to_millis(erlang:now()) - timestamp_to_millis(Start)) >= Lifetime * 1000.
+
 
 
 switchRoles(?REDAKTEUR_ATOM) ->
@@ -58,8 +58,8 @@ fireAction({?LESER_ATOM, Servername, Servernode}, Interval, Flag) ->
 
 start() ->
   {Clients, Lifetime, Servername, Servernode, Sendinterval} = readConfig(),
-  Range = list:seq(1, Clients),
-  lists:foreach(fun() ->
+  Range = lists:seq(1, Clients),
+  lists:foreach(fun(X) ->
     spawn(loop(Lifetime, Servername, Servernode, Sendinterval)) end, Range).
 
 
@@ -78,33 +78,34 @@ readConfig() ->
   {ok, Clients} = werkzeug:get_config_value(clients, Configfile),
   {ok, Lifetime} = werkzeug:get_config_value(lifetime, Configfile),
   {ok, Servername} = werkzeug:get_config_value(servername, Configfile),
-  {ok, Servernode} = werkzeug:get_config_value(servernode, Configfile),
-  {ok, Sendinterval} = werkzeug:get_config_value(sendinterval, Configfile),
+  {ok, Servernode} = werkzeug:get_config_value(nodename, Configfile),
+  {ok, Sendinterval} = werkzeug:get_config_value(sendeintervall, Configfile),
   {Clients, Lifetime, Servername, Servernode, Sendinterval}.
 
 
 
 
 loop(Lifetime, Servername, Servernode, Sendinterval) ->
-  loop(Lifetime, Servername, Servernode, Sendinterval, erlang:now(), 1, ?REDAKTEUR_ATOM, 0, false).
+  loop(Lifetime, Servername, Servernode, Sendinterval, erlang:now(), 1, ?REDAKTEUR_ATOM,  false).
 
 
 
-loop(Lifetime, Servername, Servernode, Sendinterval, StartTime, TransmittedNumber, Role, LastTimeSendedMsg, INNRflag) ->
+loop(Lifetime, Servername, Servernode, Sendinterval, StartTime, TransmittedNumber, Role, INNRflag) ->
 
   case not is_time_over(StartTime, Lifetime) of
     true ->
       if TransmittedNumber rem 5 == 0 ->
         NewRole = switchRoles(Role),
         NewInterval = changeSendInterval(Sendinterval),
-        loop(Lifetime, Servername, Servernode, NewInterval, StartTime, 1, NewRole, 0, false);
+        loop(Lifetime, Servername, Servernode, NewInterval, StartTime, 1, NewRole,false);
         true ->
-          ActionReturn = fireAction(Role, LastTimeSendedMsg, INNRflag),
-          case erlang:isNumber(ActionReturn) of
+
+          ActionReturn = fireAction({Role, Servername, Servernode}, Sendinterval, INNRflag),
+          case erlang:is_number(ActionReturn) of
             true ->
-              loop(Lifetime, Servername, Servernode, Sendinterval, StartTime, TransmittedNumber + 1, Role, ActionReturn, INNRflag);
+              loop(Lifetime, Servername, Servernode, Sendinterval, StartTime, TransmittedNumber + 1, Role, INNRflag);
             false ->
-              loop(Lifetime, Servername, Servernode, Sendinterval, StartTime, 1, switchRoles(Role), 0, false)
+              loop(Lifetime, Servername, Servernode, Sendinterval, StartTime, 1, switchRoles(Role), false)
           end
       end;
     false ->
@@ -136,6 +137,8 @@ logIncomeMsg([NNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout], TimeStampClIn)
     werkzeug:now2UTC(TShbqin) ++
     "| ; DLQ In:" ++
     werkzeug:now2UTC(TSdlqin) ++
+    "| ; DLQ Out:" ++
+    werkzeug:now2UTC(TSdlqout) ++
     "| ; C In:" ++
     werkzeug:now2UTC(TimeStampClIn) ++
     "| Nachricht:" ++
