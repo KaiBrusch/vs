@@ -59,7 +59,7 @@ loop(DlqLimit, HBQname, HBQLoggerFile, HBQ, DLQ) ->
       , loop(DlqLimit, HBQname, HBQLoggerFile, _HBQ, _DLQ)
   ;
     {ServerPID, {request, pushHBQ, [NNr, Msg, TSclientout]}} ->
-      werkzeug:logging(HBQLoggerFile, 'gepusht')
+      werkzeug:logging(HBQLoggerFile, 'gepusht /n')
       , pushHBQ(ServerPID, HBQ, [NNr, Msg, TSclientout])
       , loop(DlqLimit, HBQname, HBQLoggerFile, HBQ, DLQ)
   ;
@@ -117,7 +117,7 @@ pushHBQ(ServerPID, OldHBQ, [NNr, Msg, TSclientout]) ->
 %return: Atom ok wird zurückgegeben
 
 deliverMSG(ServerPID, DLQ, NNr, ToClient, HBQLoggerfile) ->
-  {reply, {MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout}, Terminated} = dlq:deliverMSG(ServerPID, DLQ, NNr, HBQLoggerfile),
+  {reply, {MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout}, Terminated} = dlq:deliverMSG(NNr, ToClient, DLQ, HBQLoggerfile),
   ToClient ! {reply, {MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout}, Terminated},
   ServerPID ! {reply, MSGNr}.
 

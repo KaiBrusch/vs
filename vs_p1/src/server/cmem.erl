@@ -37,7 +37,8 @@ initCMEM(Clientlifetime, Datei) ->
 updateClient({Clientlifetime,CMEM}, ClientID, NNr, Datei) ->
   F = fun({_ClientID,_LastMessageNumer, _Time}) -> _ClientID =/= ClientID end,
   _NewCMEM = lists:filter(F,CMEM),
-  _NewCMEM ++ {Clientlifetime,{ClientID,NNr,erlang:now()}}.
+  _NewCMEM ++ {ClientID,NNr,erlang:now()},
+  {Clientlifetime,_NewCMEM}.
 
 
 % getClientNNr(CMEM, ClientID)
@@ -69,10 +70,14 @@ get_last_message_id(ClientID, CMEM) ->
 %return: Das Atom ok als Rückgabewert
 
 delExpiredCl({Clientlifetime, Queue}) ->
+  erlang:display({Clientlifetime, Queue}),
   Now = timestamp_to_millis(erlang:now()),
-  F = fun({_Id,_LastMessage,_Time}) -> (Now - timestamp_to_millis(_Time)) > timestamp_to_millis(Clientlifetime) end,
+  erlang:display(Now),
+  erlang:display(Queue),
+  F = fun(X) -> 1>2 end,
   NewQueue = lists:filter(F,Queue),
-  NewQueue.
+  erlang:display(NewQueue),
+  {Clientlifetime,NewQueue}.
 
 
 

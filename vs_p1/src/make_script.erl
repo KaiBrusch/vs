@@ -18,4 +18,4 @@ make() ->
 
 net_adm:ping('dieHBQ@Allquantor.fritz.box').
 
-{'dieHBQ', 'dieHBQ@Allquantor.fritz.box'} ! {self(), {request,initHBQ}}.
+{'dieHBQ', 'dieHBQ@kai-b.fritz.box'} ! {self(), {request,initHBQ}}.

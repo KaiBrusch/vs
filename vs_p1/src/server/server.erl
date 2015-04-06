@@ -62,6 +62,7 @@ start() ->
 
   % CMEM initialisieren
   CMEM = cmem:initCMEM(Clientlifetime, ServerLogFile),
+  erlang:display(CMEM),
 
   TimeOfLastConnection = erlang:now(),
 
@@ -117,7 +118,8 @@ loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR
 
   case timestamp_to_millis(erlang:now()) - timestamp_to_millis(TimeOfLastConnection) < Latency * 1000 of
     true ->
-      CMEM = cmem:delExpiredCl(CMEM),
+      erlang:display("cmemLoop" ++ werkzeug:to_String(CMEM)),
+      _CMEM = cmem:delExpiredCl(CMEM),
 
 
       %if
@@ -128,17 +130,22 @@ loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR
 
         {dropmessage, [INNr, Msg, TSclientout]} ->
           dropmessage(HBQname, HBQnode, [INNr, Msg, TSclientout]),
-          loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ServerLogFile, erlang:now())
+          loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, _CMEM, INNR, ServerLogFile, erlang:now())
       ;
 
         {ClientPID, getmessages} ->
-          NewCMEM = sendMessages(ClientPID, CMEM, HBQname, HBQnode),
+          erlang:display("CMEM before in getmessages" ++ werkzeug:to_String(_CMEM)),
+          NewCMEM = sendMessages(ClientPID, _CMEM, HBQname, HBQnode),
+          erlang:display("newCMEM in getmessages" ++ werkzeug:to_String(NewCMEM)),
+
           loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, NewCMEM, INNR, ServerLogFile, erlang:now())
       ;
 
         {ClientPID, getmsgid} ->
           sendMSGID(ClientPID, INNR),
-          NewCMEM = cmem:updateClient(CMEM, ClientPID, INNR, ServerLogFile),
+          NewCMEM = cmem:updateClient(_CMEM, ClientPID, INNR, ServerLogFile),
+          erlang:display("newCMEM in getmsgid" ++ werkzeug:to_String(NewCMEM)),
+
           loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, NewCMEM, INNR + 1, ServerLogFile, erlang:now())
 
       end;
@@ -196,10 +203,14 @@ sendMSGID(ClientPID, INNR) ->
 % außerdem kommen für den Prozess nötige Argumente hinzu
 
 sendMessages(ToClient, CMEM, HBQname, HBQnode) ->
+
   NNr = cmem:getClientNNr(CMEM, ToClient),
+  erlang:display("client NNR: " ++ werkzeug:to_String(NNr)),
   {HBQname, HBQnode} ! {self(), {request, deliverMSG, NNr, ToClient}},
   receive
     {reply, SendNNr} ->
+      erlang:display("received in sendMSG: " ++ werkzeug:to_String(SendNNr)),
+      erlang:display("cmem before update client: " ++ werkzeug:to_String(CMEM)),
       cmem:updateClient(CMEM, ToClient, SendNNr, ?SERVER_LOGGING_FILE)
   after ?MAXIMAL_RESPONSE_TIME_BEFORE_ERROR ->
     werkzeug:logging(?SERVER_LOGGING_FILE, "sendMessages Failed")
