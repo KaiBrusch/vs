@@ -61,10 +61,15 @@ start() ->
 
   % TODO: Register node for communication!
   {Clients, Lifetime, Servername, Servernode, Sendinterval} = readConfig(),
-  Range = lists:seq(1, Clients),
-  lists:foreach(fun(X) ->
+  % Range = lists:seq(1, Clients),
+  %ists:foreach(fun(X) ->
 
-    spawn(loop(Lifetime, Servername, Servernode, Sendinterval,X)) end, Range).
+  spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client1)),
+  spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client2)),
+  spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client3)),
+  spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client4)),
+  spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client5)).
+
 
 
 % readConfig()
@@ -84,15 +89,21 @@ readConfig() ->
   {ok, Servername} = werkzeug:get_config_value(servername, Configfile),
   {ok, Servernode} = werkzeug:get_config_value(nodename, Configfile),
   {ok, Sendinterval} = werkzeug:get_config_value(sendeintervall, Configfile),
+
   {Clients, Lifetime, Servername, Servernode, Sendinterval}.
 
 
 
 
-loop(Lifetime, Servername, Servernode, Sendinterval,NamePostfix) ->
+loop(Lifetime, Servername, Servernode, Sendinterval, ClientName) ->
   % registriere den Prozess mit dem Erlang Prozess
-  erlang:register("ClientNr:" ++ NamePostfix, self()),
-  loop(Lifetime, Servername, Servernode, Sendinterval, erlang:now(), 1, ?REDAKTEUR_ATOM,  false).
+
+  REGISTER_RESULT = erlang:register(ClientName, self()),
+  erlang:display(REGISTER_RESULT),
+  erlang:display(Servernode),
+  erlang:display(net_adm:ping(Servernode)),
+
+  loop(Lifetime, Servername, Servernode, Sendinterval, erlang:now(), 1, ?REDAKTEUR_ATOM, false).
 
 
 
@@ -103,7 +114,7 @@ loop(Lifetime, Servername, Servernode, Sendinterval, StartTime, TransmittedNumbe
       if TransmittedNumber rem 5 == 0 ->
         NewRole = switchRoles(Role),
         NewInterval = changeSendInterval(Sendinterval),
-        loop(Lifetime, Servername, Servernode, NewInterval, StartTime, 1, NewRole,false);
+        loop(Lifetime, Servername, Servernode, NewInterval, StartTime, 1, NewRole, false);
         true ->
           ActionReturn = fireAction({Role, Servername, Servernode}, Sendinterval, INNRflag),
           % das ist ein tuple todo:ändern
