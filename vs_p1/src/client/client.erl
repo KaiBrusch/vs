@@ -99,8 +99,8 @@ loop(Lifetime, Servername, Servernode, Sendinterval, StartTime, TransmittedNumbe
         NewInterval = changeSendInterval(Sendinterval),
         loop(Lifetime, Servername, Servernode, NewInterval, StartTime, 1, NewRole,false);
         true ->
-
           ActionReturn = fireAction({Role, Servername, Servernode}, Sendinterval, INNRflag),
+          % das ist ein tuple todo:ändern
           case erlang:is_number(ActionReturn) of
             true ->
               loop(Lifetime, Servername, Servernode, Sendinterval, StartTime, TransmittedNumber + 1, Role, INNRflag);
