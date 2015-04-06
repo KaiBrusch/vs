@@ -10,6 +10,7 @@
 -module(cmem).
 -author("kbrusch").
 -export([initCMEM/2, getClientNNr/2, updateClient/4, delExpiredCl/1, delExpiredCl/1]).
+-include("../tools/ourtools.hrl").
 
 % initCMEM(RemTime, Datei)
 
@@ -19,8 +20,8 @@
 % post: neues 2-Tupel erstellt
 % return: {RemTime, []} - 2-Tupel mit RemTime als erstes Element und eine leere CMEM-Liste als 2. Element
 
-initCMEM(RemTime, Datei) ->
-  {RemTime, []}.
+initCMEM(Clientlifetime, Datei) ->
+  {Clientlifetime, []}.
 
 
 % updateClient(CMEM, ClientID, NNr, Datei)
@@ -89,14 +90,16 @@ update_time_for_client(ClientID, CurrentTime, [Head | Tail]) ->
 getClientNNr({RemTime, CMEMLIST}, ClientID) ->
   get_last_message_id(ClientID, CMEMLIST).
 
+
+getClientNNr({Clientlifetime, CMEM}, ClientID) ->
+  get_last_message_id(ClientID, CMEM).
+
 get_last_message_id(_, []) ->
   1;
 
-get_last_message_id(ClientID, [{ClientID, Last_message_id, _Time} | Queue]) ->
-  Last_message_id;
-
-get_last_message_id(ClientID, [_ | Queue]) ->
-  get_last_message_id(ClientID, Queue).
+get_last_message_id(ClientID, CMEM) ->
+  {ClientID, Last_message_id, _Time} = lists:keyfind(ClientID, 1, CMEM),
+  Last_message_id.
 
 
 % delExpiredCl(CMEM, Clientlifetime)
@@ -107,12 +110,12 @@ get_last_message_id(ClientID, [_ | Queue]) ->
 %post: veränderte CMEM
 %return: Das Atom ok als Rückgabewert
 
-delExpiredCl({RemTime, Queue}) ->
-  delExpiredHelper({RemTime, Queue}, []).
+delExpiredCl({Clientlifetime, Queue}) ->
+  delExpiredHelper({Clientlifetime, Queue}, []).
 
 
-delExpiredHelper({RemTime, []}, Akku) ->
-  {RemTime, Akku};
+delExpiredHelper({Clientlifetime, []}, Akku) ->
+  {Clientlifetime, Akku};
 
 delExpiredHelper({RemTime, [{_Id, _LastMessage, Time} | TailQueue]}, Akku) ->
   case expired(Time, RemTime) of
@@ -120,9 +123,16 @@ delExpiredHelper({RemTime, [{_Id, _LastMessage, Time} | TailQueue]}, Akku) ->
     true -> delExpiredHelper({RemTime, TailQueue}, Akku ++ [{_Id, _LastMessage, Time}]);
     false -> delExpiredHelper({RemTime, TailQueue}, Akku)
 
+delExpiredHelper({Clientlifetime, [{_Id, _LastMessage, Time} | Queue]}, Akku) ->
+  case expired(Time, Clientlifetime) of
+    false -> delExpiredHelper({Clientlifetime, Queue}, Akku ++ [{_Id, _LastMessage, Time}]);
+    true -> delExpiredHelper({Clientlifetime, Queue}, Akku)
   end.
 
 
 expired(Time, RemTime) ->
-  erlang:now() - Time > RemTime.
+  timestamp_to_millis(erlang:now()) - timestamp_to_millis(Time) >= timestamp_to_millis(RemTime).
+
+
+
 

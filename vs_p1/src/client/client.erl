@@ -24,6 +24,7 @@
 
 
 
+
 timestamp_to_millis({MegaSecs, Secs, MicroSecs}) ->
   (MegaSecs * 1000000 + Secs) * 1000 + round(MicroSecs / 1000).
 
@@ -57,6 +58,8 @@ fireAction({?LESER_ATOM, Servername, Servernode}, Interval, Flag) ->
 %return: client started als Atom sonst eine sinnvolle Error-Meldung
 
 start() ->
+
+  % TODO: Register node for communication!
   {Clients, Lifetime, Servername, Servernode, Sendinterval} = readConfig(),
   Range = lists:seq(1, Clients),
   lists:foreach(fun(X) ->
