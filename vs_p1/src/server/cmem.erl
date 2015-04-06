@@ -68,14 +68,6 @@ update_last_message(ClientID, NNr, [Head | Tail]) ->
   [Head | set_last_message(ClientID, NNr, Tail)].
 
 
-get_last_message_id(_, []) ->
-  1;
-
-get_last_message_id(ClientID,[{ClientID, Last_message_id, _Time} | Queue]) ->
-  Last_message_id;
-
-get_last_message_id(ClientID,[_| Queue]) ->
-  get_last_message_id(ClientID, Queue).
 
 update_time_for_client(_,_, []) ->
   [];
@@ -101,6 +93,16 @@ update_time_for_client(ClientID, CurrentTime ,[Head| Tail]) ->
 getClientNNr(CMEM, ClientID) ->
   get_last_message_id(ClientID, CMEM).
 
+get_last_message_id(_, []) ->
+  1;
+
+get_last_message_id(ClientID,[{ClientID, Last_message_id, _Time} | Queue]) ->
+  Last_message_id;
+
+get_last_message_id(ClientID,[_| Queue]) ->
+  get_last_message_id(ClientID, Queue).
+
+
 % delExpiredCl(CMEM, Clientlifetime)
 
 %%Definition: In dieser Methode werden die Clients gelöscht, welche die Clientlifetime überschritten haben.
@@ -109,11 +111,20 @@ getClientNNr(CMEM, ClientID) ->
 %post: veränderte CMEM
 %return: Das Atom ok als Rückgabewert
 
-delExpiredCl(CMEM) ->
+delExpiredCl({RemTime, Queue}) ->
+  delExpiredHelper({RemTime, Queue},[]).
 
-  [CMEM || ]
-  filter(Expired, CMEM, )
 
+delExpiredHelper({RemTime, []},Akku) ->
+  {RemTime, Akku}.
+
+delExpiredHelper({RemTime, [{_Id, _LastMessage, Time} | Queue]},Akku) ->
+  if
+    erlang:now - Time > RemTime ->
+      delExpiredHelper({RemTime, Queue},Akku++[{_Id, _LastMessage, Time}]);
+    true -> delExpiredHelperdelExpiredHelper({RemTime, Queue},Akku)
+  end.
+  
 
 
 
