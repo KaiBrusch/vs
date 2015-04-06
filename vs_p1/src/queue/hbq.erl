@@ -150,39 +150,37 @@ pushSeries(HBQ, {Size, Queue}) ->
   case two_thirds_reached(Size,HBQ) of
 
     false -> push_consistent_block(Queue, HBQ, Size, []);
-
     true -> compact_and_push(Queue,HBQ,Size, [])
 
   end.
 
 
 % pushSeries helper functions
-
-
 two_thirds_reached(HBQ, Size) ->
   erlang:len(HBQ) >= 2/3 * Size.
-
-
-compact_and_push(Queue, [ {MessageNumber, _d, _e} | TailHBQ], Size, []) ->
-  compact_and_push(Queue++[{MessageNumber, _d, _e}], TailHBQ, Size , []++[MessageNumber]);
-
-compact_and_push(Queue, [ {MessageNumber, _d, _e} | TailHBQ], Size, [[LastMessageNumber]]) ->
-  case MessageNumber == lists:last(LastMessageNumber)+1 of
-
-    true  -> compact_and_push(Queue++[{MessageNumber, _d, _e}], [TailHBQ], Size, []++[MessageNumber]);
-    false -> {Size,Queue++[{lists:last(LastMessageNumber)+1,'ErrorUser','ErrorMessage'}]}++'NEXT MESSAGE'
-    %{[{NextNumber,NextTime,NextUser} | TailHBQ]
-
-  end.
 
 push_consistent_block(Queue, [ {MessageNumber, _d, _e} | TailHBQ], Size, []) ->
   push_consistent_block(Queue++[{MessageNumber, _d, _e}], TailHBQ, Size , []++[MessageNumber]);
 
-push_consistent_block(Queue, [ {MessageNumber, _d, _e} | TailQueue], Size,[LastMessageNumber]) ->
+push_consistent_block(Queue, [ {MessageNumber, _d, _e} | TailQueue], Size,LastMessageNumberList) ->
 
-  case MessageNumber == lists:last(LastMessageNumber)+1 of
+  case MessageNumber == lists:last(LastMessageNumberList)+1 of
 
-    true  -> push_consistent_block(Queue++[{MessageNumber, _d, _e}], TailQueue, Size, []++[MessageNumber]);
+    true  -> push_consistent_block(Queue++[{MessageNumber, _d, _e}], TailQueue, Size, LastMessageNumberList++[MessageNumber]);
     false -> {[ {MessageNumber, _d, _e} | TailQueue],{Size,Queue}}
 
   end.
+
+compact_and_push(Queue, [ {MessageNumber, _d, _e} | TailHBQ], Size, []) ->
+  compact_and_push(Queue++[{MessageNumber, _d, _e}], TailHBQ, Size , []++[MessageNumber]);
+
+
+compact_and_push(Queue, [ {MessageNumber, _d, _e} | TailHBQ], Size, LastMessageNumberList) ->
+  case MessageNumber == lists:last(LastMessageNumberList)+1 of
+
+    true  -> compact_and_push(Queue++[{MessageNumber, _d, _e}], TailHBQ, Size, LastMessageNumberList++[MessageNumber]);
+    false -> {Queue, {Size,Queue++[{lists:last(LastMessageNumberList)+1,'ErrorUser','ErrorMessage'}]++'NEXT MESSAGE'}}
+    %{[{NextNumber,NextTime,NextUser} | TailHBQ]
+
+  end.
+
