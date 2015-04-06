@@ -19,6 +19,7 @@
 % return: {Size, []} - 2-Tupel mit Size als 1. Element und einer leeren Liste als 2. Element
 
 initDLQ(Size, Datei) ->
+  werkzeug:logging('DLQ init', Datei),
   {Size, []}.
 
 % expectedNr(Queue)
