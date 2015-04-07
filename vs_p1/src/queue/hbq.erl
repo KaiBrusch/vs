@@ -123,8 +123,8 @@ pushHBQ(ServerPID, OldHBQ, [NNr, Msg, TSclientout]) ->
 %return: Atom ok wird zurückgegeben
 
 deliverMSG(ServerPID, DLQ, NNr, ToClient, HBQLoggerfile) ->
-  {reply, {MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout}, Terminated} = dlq:deliverMSG(NNr, ToClient, DLQ, HBQLoggerfile),
-  ToClient ! {reply, {MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout}, Terminated},
+  {reply, [MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout], Terminated} = dlq:deliverMSG(NNr, ToClient, DLQ, HBQLoggerfile),
+  %ToClient ! {reply, [MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout], Terminated},
   ServerPID ! {reply, MSGNr}.
 
 

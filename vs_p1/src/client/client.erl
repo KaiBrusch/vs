@@ -204,10 +204,10 @@ sendMSG(Servername, Servernode, TimeLastSending, Interval, INNRflag) ->
       timer:sleep(trunc(Interval * 1000)),
       Flag = INNRflag or is_number(INNr),
       if Flag ->
-        SendingTime = erlang:now(),
-        {Servername, Servernode} ! {dropmessage, [INNr, Msg, SendingTime]},
-        % todo hier kommt ein tupel zurueck
-        SendingTime;
+        TSClientout = erlang:now(),
+        {Servername, Servernode} ! {dropmessage, [INNr, Msg, TSClientout]},
+        % todo hier kommt ein tupel zurueck, HIIIIIER
+        TSClientout;
         true ->
           werkzeug:logging(?CLIENT_LOGGING_FILE, "got an INNr error" ++ werkzeug:to_String(now()))
       end;

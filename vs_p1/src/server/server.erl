@@ -208,7 +208,7 @@ sendMessages(ToClient, CMEM, HBQname, HBQnode) ->
   receive
     {reply, SendNNr} ->
       cmem:updateClient(CMEM, ToClient, SendNNr, ?SERVER_LOGGING_FILE)
-  after ?MAXIMAL_RESPONSE_TIME_BEFORE_ERROR ->
+  after ?MAXIMAL_RESPONSE_TIME_BEFORE_ERROR -> werkzeug:logging('HBQ DOES NOT REPLY DELIVER MESSAGE', ?SERVER_LOGGING_FILE)
   end.
 
 

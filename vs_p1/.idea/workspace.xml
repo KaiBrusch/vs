@@ -2,13 +2,9 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="72b0a30e-c03d-4184-a81c-ca9904e9ad6c" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.gitignore" afterPath="$PROJECT_DIR$/.gitignore" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/client.cfg" afterPath="$PROJECT_DIR$/src/client.cfg" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/client/client.erl" afterPath="$PROJECT_DIR$/src/client/client.erl" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/queue/dlq.erl" afterPath="$PROJECT_DIR$/src/queue/dlq.erl" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/queue/hbq.erl" afterPath="$PROJECT_DIR$/src/queue/hbq.erl" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/make_script.erl" afterPath="$PROJECT_DIR$/src/make_script.erl" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/server.cfg" afterPath="$PROJECT_DIR$/src/server.cfg" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/server/server.erl" afterPath="$PROJECT_DIR$/src/server/server.erl" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
     </list>
     <ignored path="vs_p1.iws" />
@@ -64,11 +60,11 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="dlq.erl" pinned="false" current-in-tab="true">
+      <file leaf-file-name="dlq.erl" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/queue/dlq.erl">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.33170733">
-              <caret line="63" column="3" selection-start-line="63" selection-start-column="3" selection-end-line="63" selection-end-column="3" />
+            <state vertical-scroll-proportion="-5.037037">
+              <caret line="64" column="52" selection-start-line="64" selection-start-column="46" selection-end-line="64" selection-end-column="52" />
               <folding />
             </state>
           </provider>
@@ -77,8 +73,8 @@
       <file leaf-file-name="hbq.erl" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/queue/hbq.erl">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="-5.037037">
-              <caret line="158" column="48" selection-start-line="158" selection-start-column="44" selection-end-line="158" selection-end-column="48" />
+            <state vertical-scroll-proportion="-3.3703704">
+              <caret line="126" column="3" selection-start-line="126" selection-start-column="3" selection-end-line="126" selection-end-column="3" />
               <folding />
             </state>
           </provider>
@@ -87,8 +83,8 @@
       <file leaf-file-name="client.erl" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/client/client.erl">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="-8.888889">
-              <caret line="162" column="18" selection-start-line="162" selection-start-column="18" selection-end-line="162" selection-end-column="18" />
+            <state vertical-scroll-proportion="-12.407408">
+              <caret line="213" column="12" selection-start-line="213" selection-start-column="12" selection-end-line="213" selection-end-column="12" />
               <folding />
             </state>
           </provider>
@@ -124,11 +120,11 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="server.erl" pinned="false" current-in-tab="false">
+      <file leaf-file-name="server.erl" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/server/server.erl">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="6.0740743">
-              <caret line="55" column="23" selection-start-line="55" selection-start-column="23" selection-end-line="55" selection-end-column="23" />
+            <state vertical-scroll-proportion="0.69756097">
+              <caret line="216" column="22" selection-start-line="216" selection-start-column="22" selection-end-line="216" selection-end-column="22" />
               <folding />
             </state>
           </provider>
@@ -164,14 +160,14 @@
         <option value="$PROJECT_DIR$/src/server2.cfg" />
         <option value="$PROJECT_DIR$/src/server/server.cfg" />
         <option value="$PROJECT_DIR$/src/server/cmem.erl" />
-        <option value="$PROJECT_DIR$/src/server/server.erl" />
-        <option value="$PROJECT_DIR$/src/client/client.erl" />
         <option value="$PROJECT_DIR$/src/client.cfg" />
         <option value="$PROJECT_DIR$/.gitignore" />
         <option value="$PROJECT_DIR$/src/make_script.erl" />
         <option value="$PROJECT_DIR$/src/server.cfg" />
+        <option value="$PROJECT_DIR$/src/client/client.erl" />
         <option value="$PROJECT_DIR$/src/queue/hbq.erl" />
         <option value="$PROJECT_DIR$/src/queue/dlq.erl" />
+        <option value="$PROJECT_DIR$/src/server/server.erl" />
       </list>
     </option>
   </component>
@@ -260,6 +256,24 @@
             </PATH_ELEMENT>
             <PATH_ELEMENT>
               <option name="myItemId" value="src" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+          </PATH>
+          <PATH>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="vs_p1" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="vs_p1" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="src" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="server" />
               <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
             </PATH_ELEMENT>
           </PATH>
@@ -561,7 +575,7 @@
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33476394" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Maven Projects" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Application Servers" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" weight="0.12660944" sideWeight="0.49489796" order="0" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" weight="0.24606581" sideWeight="0.49489796" order="0" side_tool="false" content_ui="combo" />
       <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.25" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.4" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
@@ -920,22 +934,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/server/server.erl">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="6.0740743">
-          <caret line="55" column="23" selection-start-line="55" selection-start-column="23" selection-end-line="55" selection-end-column="23" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/client/client.erl">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="-8.888889">
-          <caret line="162" column="18" selection-start-line="162" selection-start-column="18" selection-end-line="162" selection-end-column="18" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/tools/werkzeug.erl">
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.0">
@@ -944,18 +942,34 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/src/client/client.erl">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="-12.407408">
+          <caret line="213" column="12" selection-start-line="213" selection-start-column="12" selection-end-line="213" selection-end-column="12" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/src/queue/hbq.erl">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="-5.037037">
-          <caret line="158" column="48" selection-start-line="158" selection-start-column="44" selection-end-line="158" selection-end-column="48" />
+        <state vertical-scroll-proportion="-3.3703704">
+          <caret line="126" column="3" selection-start-line="126" selection-start-column="3" selection-end-line="126" selection-end-column="3" />
           <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/queue/dlq.erl">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.33170733">
-          <caret line="63" column="3" selection-start-line="63" selection-start-column="3" selection-end-line="63" selection-end-column="3" />
+        <state vertical-scroll-proportion="-5.037037">
+          <caret line="64" column="52" selection-start-line="64" selection-start-column="46" selection-end-line="64" selection-end-column="52" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/server/server.erl">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="0.69756097">
+          <caret line="216" column="22" selection-start-line="216" selection-start-column="22" selection-end-line="216" selection-end-column="22" />
           <folding />
         </state>
       </provider>
