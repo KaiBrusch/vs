@@ -1,0 +1,35 @@
+##################################################
+#            Message of the Day README           #
+#            Kai Brusch, Ivan Morozov            #
+#         Praktikumsgruppe 3, Team 6             #
+##################################################
+
+Wie wird die Komponenten Software gestartet?
+
+Compilieren aller .erl Datein in Ordnern
+
+    src/queue
+    src/server
+    src/client
+    src/tools
+
+Die ServerNode muss mit dem in der server.cfg angebenen ServerNode Namen und einem Cookie gestartetwerden gestartet werden.
+
+    erl -name <ServerNodeName> -setcookie cookie
+
+Die HBQNode muss mit dem in der server.cfg angebenen HBQNode Namen und dem gleichen Cookie wie die ServerNode gestartet werden.
+
+    erl -name <HBQNodeName> -setcookie cookie
+
+Die ClientNode kann mit einem beliebigen Namen und dem gleichen Cookie wie die ServerNode und die HBQNode gestartet werden
+
+    erl -name client -setcookie cookie
+
+Die HBQNode muss die HBQ starten
+
+    hbq:start().
+
+Die ServerNode muss den Server starten
+
+    server:start().
+
