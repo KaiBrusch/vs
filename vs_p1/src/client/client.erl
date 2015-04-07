@@ -120,8 +120,7 @@ loop(Lifetime, Servername, Servernode, Sendinterval, StartTime, TransmittedNumbe
         loop(Lifetime, Servername, Servernode, NewInterval, StartTime, 1, NewRole, false);
         true ->
           ActionReturn = fireAction({Role, Servername, Servernode}, Sendinterval, INNRflag),
-
-          case erlang:is_number(ActionReturn) of
+          case erlang:is_tuple(ActionReturn) of
             true ->
               loop(Lifetime, Servername, Servernode, Sendinterval, StartTime, TransmittedNumber + 1, Role, INNRflag);
             false ->
