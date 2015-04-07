@@ -33,3 +33,6 @@ Die ServerNode muss den Server starten
 
     server:start().
 
+Die client Node muss die Clients starten
+
+    client:start().
