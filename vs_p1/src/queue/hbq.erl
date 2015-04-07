@@ -8,8 +8,8 @@
 %%%-------------------------------------------------------------------
 -module(hbq).
 -author("kbrusch").
--export([initHBQandDLQ/3, start/0]).
--define(QUEUE_LOGGING_FILE, fun() -> werkzeug:message_to_string(erlang:date()) ++ "-HBQ.txt" end).
+-export([initHBQandDLQ/2, start/0]).
+-define(QUEUE_LOGGING_FILE, "HBQ.txt").
 
 
 %start()
@@ -30,11 +30,15 @@ start() ->
   % register this process
   erlang:register(HBQname, self()),
 
-  % init logger file
-  HBQLoggerFile = 'hbq.log',
+  werkzeug:logging(?QUEUE_LOGGING_FILE,
+    "Die HBQ wurde unter dem Namen:" ++
+      werkzeug:to_String(HBQname) ++
+      "registriert \n"
+  ),
+
 
   % lifetime loop
-  loop(DlqLimit, HBQname, HBQLoggerFile, [], []).
+  loop(DlqLimit, HBQname, [], []).
 
 
 % loop()
@@ -52,23 +56,62 @@ start() ->
 % post: der Prozess wurde erfolgreich terminiert
 % return: hbq-process terminated als Atom
 
-loop(DlqLimit, HBQname, HBQLoggerFile, HBQ, DLQ) ->
+loop(DlqLimit, HBQname, HBQ, DLQ) ->
   receive
 
     {ServerPID, {request, initHBQ}} ->
-      {_HBQ, _DLQ} = initHBQandDLQ(DlqLimit, ServerPID, HBQLoggerFile)
-      , loop(DlqLimit, HBQname, HBQLoggerFile, _HBQ, _DLQ)
+
+
+      {_HBQ, _DLQ} = initHBQandDLQ(DlqLimit, ServerPID),
+
+      werkzeug:logging(?QUEUE_LOGGING_FILE,
+        "Die HBQ && DLQ wurden Initialisiert, der Inhalt {_HBQ, _DLQ}: " ++
+          werkzeug:to_String( {_HBQ, _DLQ}) ++
+          "\n"
+      )
+
+
+      , loop(DlqLimit, HBQname, _HBQ, _DLQ)
   ;
     {ServerPID, {request, pushHBQ, [NNr, Msg, TSclientout]}} ->
-       _NewHBQ = pushHBQ(ServerPID, HBQ, [NNr, Msg, TSclientout])
+      _NewHBQ = pushHBQ(ServerPID, HBQ, [NNr, Msg, TSclientout]),
+
+      werkzeug:logging(?QUEUE_LOGGING_FILE,
+        "Die HBQ hat einen request für pushHBQ erhalten, mit der Message:" ++
+          werkzeug:to_String([NNr, Msg, TSclientout]) ++
+          "Die Nachricht wurde in die HBQ eingetragen, die HBQ vor dem Eintragen:" ++
+          werkzeug:to_String(HBQ) ++
+          "Die  die _NewHBQ nach dem Eintragen:" ++
+          werkzeug:to_String(_NewHBQ) ++
+          "\n"
+      )
+
       , {NewHBQ, NewDLQ} = pushSeries(_NewHBQ, DLQ)
-      , werkzeug:logging(HBQLoggerFile, 'gepusht /n')
-      , loop(DlqLimit, HBQname, HBQLoggerFile, NewHBQ, NewDLQ)
+
+      , werkzeug:logging(?QUEUE_LOGGING_FILE,
+        "Es wurde PushSeries für  (_NewHBQ, DLQ):" ++
+          werkzeug:to_String([_NewHBQ, DLQ]) ++
+          " ausgeführt. Das Ergebnis von PushSeries  {NewHBQ, NewDLQ}:" ++
+          werkzeug:to_String({NewHBQ, NewDLQ}) ++
+          "\n"
+      )
+
+      , loop(DlqLimit, HBQname, NewHBQ, NewDLQ)
 
   ;
     {ServerPID, {request, deliverMSG, NNr, ToClient}} ->
-      deliverMSG(ServerPID, DLQ, NNr, ToClient, HBQLoggerFile)
-      , loop(DlqLimit, HBQname, HBQLoggerFile, HBQ, DLQ)
+
+      werkzeug:logging(?QUEUE_LOGGING_FILE,
+        "Es wurde deliverMSG für die MessageNr:" ++
+          werkzeug:to_String(NNr) ++
+          " Die DLQ mit dem Inhalt:" ++
+          werkzeug:to_String(DLQ) ++
+          " wird mit dem ausliefern in deliverMSG beauftragt" ++
+          "\n"
+      ),
+
+      deliverMSG(ServerPID, DLQ, NNr, ToClient)
+      , loop(DlqLimit, HBQname, HBQ, DLQ)
   ;
     {ServerPID, {request, dellHBQ}} ->
       dellHBQ(ServerPID, HBQname)
@@ -88,8 +131,9 @@ loop(DlqLimit, HBQname, HBQLoggerFile, HBQ, DLQ) ->
 % post: ein 2-Tupel wurde erstellt. Das 1. Element ist die HBQ und das 2. Element die DLQ.
 % return: 2-Tupel: {[], DLQ}
 
-initHBQandDLQ(Size, ServerPID, HBQLoggerFile) ->
-  DLQ = dlq:initDLQ(Size, HBQLoggerFile),
+initHBQandDLQ(Size, ServerPID) ->
+  werkzeug:logging("Die HBQ und DLQ wurden initialisiert",?QUEUE_LOGGING_FILE),
+  DLQ = dlq:initDLQ(Size, ?QUEUE_LOGGING_FILE),
   ServerPID ! {reply, ok},
   {[], DLQ}.
 
@@ -122,8 +166,8 @@ pushHBQ(ServerPID, OldHBQ, [NNr, Msg, TSclientout]) ->
 %post: Der Client hat eine neue Nachricht erhalten, die DLQ ist um eine Nachricht kleiner geworden und der Server hat ein die tatsächlich gesendete Nachrichtennummer erhalten.
 %return: Atom ok wird zurückgegeben
 
-deliverMSG(ServerPID, DLQ, NNr, ToClient, HBQLoggerfile) ->
-  {reply, [MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout], Terminated} = dlq:deliverMSG(NNr, ToClient, DLQ, HBQLoggerfile),
+deliverMSG(ServerPID, DLQ, NNr, ToClient) ->
+  {reply, [MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout], Terminated} = dlq:deliverMSG(NNr, ToClient, DLQ),
   %ToClient ! {reply, [MSGNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout], Terminated},
   ServerPID ! {reply, MSGNr}.
 
@@ -162,12 +206,15 @@ pushSeries(HBQ, {Size, Queue}) ->
 
   {NHBQ, NDLQ} = case {ExpectedMessageNumber == CurrentLastMessageNumber, two_thirds_reached(HBQ, Size)} of
                    {true, _} ->
+                     werkzeug:logging(?QUEUE_LOGGING_FILE, 'hier wird push2DLQ ausgeführt true,true im tupel \n'),
                      NewDLQ = dlq:push2DLQ({CurrentLastMessageNumber, Msg, TSclientout, TShbqin}, {Size, Queue}, ?QUEUE_LOGGING_FILE),
-                     NewHBQ = lists:filter(fun({Nr, _, _, _}) -> Nr =/= CurrentLastMessageNumber end,HBQ),
+                     NewHBQ = lists:filter(fun({Nr, _, _, _}) -> Nr =/= CurrentLastMessageNumber end, HBQ),
                      {NewHBQ, NewDLQ};
                    {false, false} ->
+                     werkzeug:logging(?QUEUE_LOGGING_FILE, 'hier wird nur zurückgegeben false,false im tupel \n'),
                      {HBQ, {Size, Queue}};
                    {false, true} ->
+                     werkzeug:logging(?QUEUE_LOGGING_FILE, 'hier wird consistent block false,true im tupel \n'),
                      {ConsistentBlock, NewHBQ} = create_consistent_block(HBQ),
                      {NewHBQ, push_consisten_block_to_dlq(ConsistentBlock, {Size, Queue})}
                  end,
@@ -187,12 +234,12 @@ push_consisten_block_to_dlq_([], DLQ) ->
 
 
 
-create_consistent_block([H|T]) ->
+create_consistent_block([H | T]) ->
   TAIL = erlang:tl(H ++ T),
   create_consistent_block_(H ++ T, TAIL, [], 0);
 create_consistent_block([]) ->
   werkzeug:logging("create_consistent_block wurde mit einer Leeren HBQ aufgerufen, WTF"),
-  {[],[]}.
+  {[], []}.
 
 produce_failure_message(NNr, _NNr) ->
   {_NNr, "Fehlernachricht von:" ++ NNr ++ " bis" ++ "_NNr", "Error", "Error"}.

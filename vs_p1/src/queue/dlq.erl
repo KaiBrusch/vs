@@ -8,7 +8,8 @@
 %%%-------------------------------------------------------------------
 -module(dlq).
 -author("kbrusch").
--export([initDLQ/2, deliverMSG/4, sortDLQ/1, expectedNrDLQ/1, push2DLQ/3,last/1]).
+-export([initDLQ/2, deliverMSG/3, sortDLQ/1, expectedNrDLQ/1, push2DLQ/3,last/1]).
+-define(QUEUE_LOGGING_FILE, "HBQ.txt").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % DLQ Datentyp
@@ -40,13 +41,20 @@ initDLQ(Size, Datei) ->
 
 
 push2DLQ({NNr, Msg, TSclientout, TShbqin}, {Size, Queue}, Datei) ->
-
-  case erlang:length(Queue) < Size of
+  werkzeug:logging(?QUEUE_LOGGING_FILE,"Aufruf von push2DLQ mit {Size, Queue} :" ++
+    werkzeug:to_String({Size, Queue}) ++ "\n"),
+  werkzeug:logging(?QUEUE_LOGGING_FILE," erlang:length(Queue) < Size :" ++
+    werkzeug:to_String(erlang:length(Queue) < Size) ++ "\n"),
+  case erlang:length(Queue) >= Size of
       true ->
-        werkzeug:logging("Die DLQ ist Voll, Message:" ++ werkzeug:to_String(NNr) ++ " kann nicht verarbeitet werden!", Datei),
+        werkzeug:logging(?QUEUE_LOGGING_FILE,"Die DLQ ist Voll, Message:" ++ werkzeug:to_String(NNr) ++ " kann nicht verarbeitet werden!"),
         {Size, Queue};
       false ->
+        werkzeug:logging(?QUEUE_LOGGING_FILE, 'FALSE in push2DLQ \n'),
+        DEBUGGER = Queue ++ [{NNr, Msg, TSclientout,TShbqin, erlang:now()}],
+        werkzeug:to_String(DEBUGGER),
         {Size, Queue ++ [{NNr, Msg, TSclientout,TShbqin, erlang:now()}]}
+
   end.
 
 
@@ -59,7 +67,7 @@ push2DLQ({NNr, Msg, TSclientout, TShbqin}, {Size, Queue}, Datei) ->
 % post: eine MSGNr wurde zurückgegeben und die Queue um diese Nachricht verkleinert
 % return: die tatsächlich verschickte MSGNr als Integer-Wert an den HBQ-Prozess
 
-deliverMSG(MSGNr, ClientPID, {Size, Queue}, Datei) ->
+deliverMSG(MSGNr, ClientPID, {Size, Queue}) ->
   % todo hier noch loggen
   {_Size,SortedQueue} = sortDLQ({Size, Queue}),
   Result = lists:keyfind(MSGNr,1,SortedQueue),

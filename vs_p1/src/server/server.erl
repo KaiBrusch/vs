@@ -22,8 +22,7 @@
 %% Im Anschluss wartet er auf eine Antwort, seitens des HBQ-Prozesses: {reply, ok}.
 %% Des Weiteren muss der Server im lokalen Namensdienst registriert werden (siehe Anforderung 8).
 
-% pre: keine
-% post: Server ist gestartet und im lokalen Namensdienst von Erlang registriert
+% pre: keinedt und im lokalen Namensdienst von Erlang registriert
 % return: server started als Atom sonst eine sinnvolle Error-Meldung
 
 
@@ -47,6 +46,7 @@ start() ->
 
   % registriere den Prozess mit dem Erlang Prozess
   erlang:register(Servername, self()),
+  werkzeug:logging(?SERVER_LOGGING_FILE, "Server is registred"),
 
   % Nachrichtennummer zum start
   INNR = 1,
@@ -59,7 +59,16 @@ start() ->
 
   % CMEM initialisieren
   CMEM = cmem:initCMEM(Clientlifetime, ?SERVER_LOGGING_FILE),
+
+  werkzeug:logging(?SERVER_LOGGING_FILE,
+    "Server hat die CMEM initializiert, der INHALT:" ++
+      werkzeug:to_String(CMEM) ++
+      "\n"
+  ),
+
+
   TimeOfLastConnection = erlang:now(),
+
 
   loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ?SERVER_LOGGING_FILE, TimeOfLastConnection).
 
@@ -83,8 +92,6 @@ readConfig() ->
   {ok, DLQlimit} = werkzeug:get_config_value(dlqlimit, ConfigListe),
   {ok, HBQname} = werkzeug:get_config_value(hbqname, ConfigListe),
   {ok, HBQnode} = werkzeug:get_config_value(hbqnode, ConfigListe),
-
-
 
 
   {Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit}.
@@ -111,30 +118,82 @@ readConfig() ->
 
 loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ServerLogFile, TimeOfLastConnection) ->
 
+
   case timestamp_to_millis(erlang:now()) - timestamp_to_millis(TimeOfLastConnection) < Latency * 1000 of
     true ->
       _CMEM = cmem:delExpiredCl(CMEM),
 
+      werkzeug:logging(?SERVER_LOGGING_FILE,
+        "Der Server hat die cmem:delExpiredCi Routine aufgerufen," ++
+          " Der Inhalt der CMEM vor der Routine ist:" ++
+          werkzeug:to_String(CMEM) ++
+          " Der Inhalt der CMEM nach der Routine ist:" ++
+          werkzeug:to_String(_CMEM) ++
+          "\n"
+      ),
 
-      %if
-      %  erlang:now() - timeOfLastConnection > erlang:now() ->
-      %    HBQ ! pushHBQ
 
       receive
 
         {dropmessage, [INNr, Msg, TSclientout]} ->
+
+          werkzeug:logging(?SERVER_LOGGING_FILE,
+            "Der Server hat die Message:dropmessage bekommen," ++
+              " Der Inhalt der dropmessage ist:" ++
+              werkzeug:to_String([INNr, Msg, TSclientout]) ++
+              "\n"
+          ),
+
           dropmessage(HBQname, HBQnode, [INNr, Msg, TSclientout]),
           loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, _CMEM, INNR, ServerLogFile, erlang:now())
       ;
 
         {ClientPID, getmessages} ->
+
+          werkzeug:logging(?SERVER_LOGGING_FILE,
+            "Der Server hat die Message:getmessages bekommen," ++
+              " von der ClientPID:" ++
+              werkzeug:to_String(ClientPID) ++
+              "\n"
+          ),
+
           NewCMEM = sendMessages(ClientPID, _CMEM, HBQname, HBQnode),
+
+          werkzeug:logging(?SERVER_LOGGING_FILE,
+            "Der Server hat die sendMessages routine " ++
+              " für den ClientPID:" ++
+              werkzeug:to_String(ClientPID) ++
+              " aufgerufen, die NewCMEM aus der Routine ist:" ++
+              werkzeug:to_String(NewCMEM) ++
+              "\n"
+          ),
+
           loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, NewCMEM, INNR, ServerLogFile, erlang:now())
       ;
 
         {ClientPID, getmsgid} ->
+
+          werkzeug:logging(?SERVER_LOGGING_FILE,
+            "Der Server hat die getmsgid routine " ++
+              " für den ClientPID:" ++
+              werkzeug:to_String(ClientPID) ++
+              " aufgerufen" ++
+              "\n"
+          ),
+
           sendMSGID(ClientPID, INNR),
           NewCMEM = cmem:updateClient(_CMEM, ClientPID, INNR, ServerLogFile),
+
+
+          werkzeug:logging(?SERVER_LOGGING_FILE,
+            "Der Server hat die sendMSGID routine " ++
+              " für den ClientPID:" ++
+              werkzeug:to_String(ClientPID) ++
+              " aufgerufen und die CMEM upgedatet, die neue CMEM ist:" ++
+              werkzeug:to_String(NewCMEM) ++
+              "\n"
+          ),
+
           loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, NewCMEM, INNR + 1, ServerLogFile, erlang:now())
 
       end;
@@ -191,11 +250,32 @@ sendMSGID(ClientPID, INNR) ->
 % außerdem kommen für den Prozess nötige Argumente hinzu
 
 sendMessages(ToClient, CMEM, HBQname, HBQnode) ->
-
   NNr = cmem:getClientNNr(CMEM, ToClient),
+
+  werkzeug:logging(?SERVER_LOGGING_FILE,
+    "Der BODY der sendMessages Routine wird aufgerufen," ++
+      "es soll die Nachricht zum ClientPID:" ++
+      werkzeug:to_String(ToClient) ++
+      "geschickt  werden, cmem:getClientNNr zeigt:" ++
+      werkzeug:to_String(NNr) ++
+      " als letzte versendete nummer für den client  " ++
+      werkzeug:to_String(ToClient) ++ " an" ++
+      "\n"
+  ),
+
   {HBQname, HBQnode} ! {self(), {request, deliverMSG, NNr, ToClient}},
   receive
     {reply, SendNNr} ->
+
+      werkzeug:logging(?SERVER_LOGGING_FILE,
+        "Der BODY der sendMessages Routine erhält einen reply aus der hbq," ++
+          "es wurde die tatsächlich versendete Nachrichtennummer zurückgegeben:" ++
+          werkzeug:to_String(SendNNr) ++
+          " Jetzt wird die CMEM den Client updaten:" ++
+          "\n"
+      ),
+
+
       cmem:updateClient(CMEM, ToClient, SendNNr, ?SERVER_LOGGING_FILE)
   after ?MAXIMAL_RESPONSE_TIME_BEFORE_ERROR ->
     werkzeug:logging('HBQ DOES NOT REPLY DELIVER MESSAGE', ?SERVER_LOGGING_FILE)
@@ -212,9 +292,24 @@ sendMessages(ToClient, CMEM, HBQname, HBQnode) ->
 %post: erreichte Nachricht vom Client wurde erfolgreich in die HBQ eingetragen return: Atom ok wird zurückgegeben
 
 dropmessage(HBQname, HBQnode, [NNr, Msg, Tsclientout]) ->
+
+  werkzeug:logging(?SERVER_LOGGING_FILE,
+    "Der BODY der dropmessage Routine wird aufgerufen," ++
+      "es soll die Nachricht:" ++
+      werkzeug:to_String([NNr, Msg, Tsclientout]) ++
+      "gespeichert werden:" ++
+      "\n"
+  ),
+
   {HBQname, HBQnode} ! {self(), {request, pushHBQ, [NNr, Msg, Tsclientout]}},
   receive
-    {reply, ok} -> ok
+    {reply, ok} ->
+      werkzeug:logging(?SERVER_LOGGING_FILE,
+        "Der Body von dropmessage, es wurde pushHBQ gecallt" ++
+          "die Anwort war ok" ++
+          "\n"
+      ),
+      ok
   after ?MAXIMAL_RESPONSE_TIME_BEFORE_ERROR ->
     werkzeug:logging(?SERVER_LOGGING_FILE, "dropmessage for msg:" ++ Msg ++ " Failed")
   end.

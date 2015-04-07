@@ -83,9 +83,8 @@ get_last_message_id(ClientID, CMEM) ->
 %return: Das Atom ok als Rückgabewert // falsch veränderte CMEM
 
 delExpiredCl({Clientlifetime, Queue}) ->
-  erlang:display({Clientlifetime, Queue}),
   Now = timestamp_to_millis(erlang:now()),
-  F = fun({_ClientID,_LastMessageNumer, _Time}) -> (Now - timestamp_to_millis(_Time)) > Clientlifetime * 1000   end,
+  F = fun({_ClientID,_LastMessageNumer, _Time}) -> (Now - timestamp_to_millis(_Time)) < Clientlifetime * 1000   end,
   NewQueue = lists:filter(F,Queue),
   {Clientlifetime,NewQueue}.
 
