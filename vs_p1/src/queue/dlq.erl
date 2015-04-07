@@ -8,7 +8,7 @@
 %%%-------------------------------------------------------------------
 -module(dlq).
 -author("kbrusch").
--export([initDLQ/2, deliverMSG/4]).
+-export([initDLQ/2, deliverMSG/4, sortDLQ/1, expectedNrDLQ/1, push2DLQ/3,last/1]).
 
 % initDLQ(Size, Datei)
 
@@ -37,9 +37,9 @@ initDLQ(Size, Datei) ->
 
 push2DLQ({NNr, Msg, TSclientout, TShbqin}, {Size, Queue}, Datei) ->
 
-  case lists:length(Queue) < Size of
+  case erlang:length(Queue) < Size of
       true ->
-        werkzeug:logging("Die DLQ ist Voll, Message:"++NNr++" kann nicht verarbeitet werden!", Datei),
+        werkzeug:logging("Die DLQ ist Voll, Message:" ++ werkzeug:to_String(NNr) ++ " kann nicht verarbeitet werden!", Datei),
         {Size, Queue};
       false ->
         {Size, Queue ++ [{NNr, Msg, TSclientout,TShbqin, erlang:now()}]}
@@ -60,8 +60,8 @@ push2DLQ({NNr, Msg, TSclientout, TShbqin}, {Size, Queue}, Datei) ->
 % DLQ = [{NNr, Msg, TSclientout, TShbqin, TSdlqin}..n]
 
 deliverMSG(MSGNr, ClientPID, {Size, Queue}, Datei) ->
-  SortedQueue = sortDLQ(Queue),
-  Result = lists:findkey(MSGNr,1,SortedQueue),
+  {_Size,SortedQueue} = sortDLQ({Size, Queue}),
+  Result = lists:keyfind(MSGNr,1,SortedQueue),
   {NNr, Msg, TSclientout, TShbqin, TSdlqin} = findMessage(SortedQueue,MSGNr,Result),
   Exists = lists:any(fun({_NNr, _, _, _, _}) -> _NNr > NNr end, SortedQueue),
   Tsdlqout = erlang:now(),
@@ -77,7 +77,7 @@ findMessage([],_, _) ->
   {0, "DUMMY", "DUMMY", "DUMMY", "DUMMY"} ;
 
 findMessage(SortedQueue,MSGNr, false) ->
-  findMessage(SortedQueue,MSGNr +1,lists:findkey(MSGNr +1 ,1,SortedQueue));
+  findMessage(SortedQueue,MSGNr +1,lists:keyfind(MSGNr +1 ,1,SortedQueue));
 
 findMessage(_,_,{NNr, Msg, TSclientout, TShbqin, TSdlqin}) ->
   {NNr, Msg, TSclientout, TShbqin, TSdlqin}.
@@ -86,16 +86,16 @@ findMessage(_,_,{NNr, Msg, TSclientout, TShbqin, TSdlqin}) ->
 
 
 
-last([]) ->
+last({Size,[]}) ->
   1;
-last(List) ->
+last({Size,List}) ->
   lists:last(List).
 
 
-sortDLQ({_,Queue}) ->
+sortDLQ({Size,Queue}) ->
   ORDER = fun({NNr, _, _, _, _},{_NNr, _, _, _, _}) ->
     NNr < _NNr end,
-  lists:usort(ORDER,Queue).
+  {Size,lists:usort(ORDER,Queue)}.
 
 % expectedNr(Queue)
 
@@ -106,9 +106,9 @@ sortDLQ({_,Queue}) ->
 % return: nächste Nachrichtennummer die verwendet werden kann, sonst 1 bei leerer Liste
 
 
-expectedNrDLQ([]) ->
+expectedNrDLQ({_,[]}) ->
   1;
-expectedNrDLQ(SortedDLQ) ->
+expectedNrDLQ({_,SortedDLQ}) ->
   {NNr, _, _, _, _} = lists:last(SortedDLQ),
   NNr +1.
 

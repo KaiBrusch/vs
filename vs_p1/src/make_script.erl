@@ -8,14 +8,38 @@
 %%%-------------------------------------------------------------------
 -module(make_script).
 -author("kbrusch").
--export([make/0]).
+-expiort([findConistentWError/3]).
 
 
-make() ->
 
-    c('tools/werkzeug.erl'), c('server/server.erl'), c('server/cmem.erl'), c('queue/hbq.erl'), c('queue/dlq.erl'), c('client/client.erl').
+findConistentWError([Head | Tail], [], false) ->
+  findConistentWError(Tail, []++[Head], false);
+
+findConistentWError([], Akku,_) -> Akku.
+
+findConistentWError([Head | Tail], Akku, false) ->
+  case lists:last(Akku) == Head of
+    true -> findConistentWError(Tail, []++[Head], false);
+    false -> findConistentWError(Tail, []++[Head]++['ERROR'], true)
+  end;
+
+findConistentWError([Head | Tail], Akku, true) ->
+  case lists:last(Akku) == Head of
+    true -> findConistentWError(Tail, []++[Head], true);
+    false -> Akku
+  end.
 
 
-net_adm:ping('dieHBQ@Allquantor.fritz.box').
 
-{'dieHBQ', 'dieHBQ@kai-b.fritz.box'} ! {self(), {request,initHBQ}}.
+
+%make() ->
+
+%    c('tools/werkzeug.erl'), c('server/server.erl'), c('server/cmem.erl'), c('queue/hbq.erl'), c('queue/dlq.erl'), c('client/client.erl').
+
+
+%net_adm:ping('dieHBQ@Allquantor.fritz.box').
+
+%{'dieHBQ', 'dieHBQ@kai-b.fritz.box'} ! {self(), {request,initHBQ}}.
+%{'dieHBQ', 'dieHBQ@kws-70-162.HAW.1X' } ! {self(), {request,initHBQ}}.
+% 'dieHBQ@kws-70-162.HAW.1X'
+% net_adm:ping('dieHBQ@ws-70-162.HAW.1X')

@@ -105,6 +105,8 @@ initHBQandDLQ(Size, ServerPID, HBQLoggerFile) ->
 
 pushHBQ(ServerPID, OldHBQ, [NNr, Msg, TSclientout]) ->
   Tshbqin = erlang:now(),
+  %erlang:display("das ist die queue"++werkzeug:to_String(OldHBQ)),
+  %erlang:display("das ist die neue queue"++werkzeug:to_String(OldHBQ ++ [{NNr, Msg, TSclientout, Tshbqin}])),
   SortedHBQ = sortHBQ(OldHBQ ++ [{NNr, Msg, TSclientout, Tshbqin}]),
   ServerPID ! {reply, ok},
   SortedHBQ.
@@ -156,9 +158,9 @@ pushSeries(HBQ, {Size, Queue}) ->
   %TODO TEST THAT SHEET WITH UNSORTED DLQ CAUSE DLQ SHOULD BE ALREADY SORTED
   ExpectedMessageNumber = dlq:expectedNrDLQ(dlq:sortDLQ({Size, Queue})),
 
-  {CurrentLastMessageNumber, Msg, TSclientout, TShbqin} = hbq:head(HBQ),
+  {CurrentLastMessageNumber, Msg, TSclientout, TShbqin} = head(HBQ),
 
-  {NHBQ, NDLQ} = case {ExpectedMessageNumber == CurrentLastMessageNumber, two_thirds_reached(Size, HBQ)} of
+  {NHBQ, NDLQ} = case {ExpectedMessageNumber == CurrentLastMessageNumber, two_thirds_reached(HBQ, Size)} of
                    {true, _} ->
                      NewDLQ = dlq:push2DLQ({CurrentLastMessageNumber, Msg, TSclientout, TShbqin}, {Size, Queue}, ?QUEUE_LOGGING_FILE),
                      NewHBQ = lists:filter(fun({Nr, _, _, _}) -> Nr =/= CurrentLastMessageNumber end,HBQ),
@@ -220,11 +222,12 @@ head(List) ->
   erlang:hd(List).
 % pushSeries helper functions
 two_thirds_reached(HBQ, Size) ->
-  erlang:len(HBQ) >= 2 / 3 * Size.
+  erlang:length(HBQ) >= 2 / 3 * Size.
 
 
 
-sortHBQ({_, Queue}) ->
+sortHBQ(Queue) ->
+  erlang:display("das ist die queue"++werkzeug:to_String(Queue)),
   ORDER = fun({NNr, _, _, _}, {_NNr, _, _, _}) ->
     NNr < _NNr end,
   lists:usort(ORDER, Queue).

@@ -103,6 +103,9 @@ loop(Lifetime, Servername, Servernode, Sendinterval, ClientName) ->
   erlang:display(Servernode),
   erlang:display(net_adm:ping(Servernode)),
 
+  %% Anders als in dem Entwurf wird die transmittedMsg mit 1 initialisiert um die Verarbeitung in der Loop zu vereinfachen
+
+
   loop(Lifetime, Servername, Servernode, Sendinterval, erlang:now(), 1, ?REDAKTEUR_ATOM, false).
 
 
@@ -117,7 +120,7 @@ loop(Lifetime, Servername, Servernode, Sendinterval, StartTime, TransmittedNumbe
         loop(Lifetime, Servername, Servernode, NewInterval, StartTime, 1, NewRole, false);
         true ->
           ActionReturn = fireAction({Role, Servername, Servernode}, Sendinterval, INNRflag),
-          % das ist ein tuple todo:ändern
+
           case erlang:is_number(ActionReturn) of
             true ->
               loop(Lifetime, Servername, Servernode, Sendinterval, StartTime, TransmittedNumber + 1, Role, INNRflag);
@@ -203,6 +206,7 @@ sendMSG(Servername, Servernode, TimeLastSending, Interval, INNRflag) ->
       if Flag ->
         SendingTime = erlang:now(),
         {Servername, Servernode} ! {dropmessage, [INNr, Msg, SendingTime]},
+        % todo hier kommt ein tupel zurueck
         SendingTime;
         true ->
           werkzeug:logging(?CLIENT_LOGGING_FILE, "got an INNr error" ++ werkzeug:to_String(now()))
