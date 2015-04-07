@@ -9,6 +9,7 @@
 -module(hbq).
 -author("kbrusch").
 -export([initHBQandDLQ/3, start/0]).
+-define(QUEUE_LOGGING_FILE, fun() -> werkzeug:message_to_string(erlang:date()) ++ "-HBQ.txt" end).
 
 
 %start()
@@ -33,7 +34,7 @@ start() ->
   HBQLoggerFile = 'hbq.log',
 
   % lifetime loop
-  loop(DlqLimit,HBQname,HBQLoggerFile, [], []).
+  loop(DlqLimit, HBQname, HBQLoggerFile, [], []).
 
 
 % loop()
@@ -59,12 +60,14 @@ loop(DlqLimit, HBQname, HBQLoggerFile, HBQ, DLQ) ->
       , loop(DlqLimit, HBQname, HBQLoggerFile, _HBQ, _DLQ)
   ;
     {ServerPID, {request, pushHBQ, [NNr, Msg, TSclientout]}} ->
-      werkzeug:logging(HBQLoggerFile, 'gepusht /n')
-      , pushHBQ(ServerPID, HBQ, [NNr, Msg, TSclientout])
-      , loop(DlqLimit, HBQname, HBQLoggerFile, HBQ, DLQ)
+       _NewHBQ = pushHBQ(ServerPID, HBQ, [NNr, Msg, TSclientout])
+      , {NewHBQ, NewDLQ} = pushSeries(_NewHBQ, DLQ)
+      , werkzeug:logging(HBQLoggerFile, 'gepusht /n')
+      , loop(DlqLimit, HBQname, HBQLoggerFile, NewHBQ, NewDLQ)
+
   ;
     {ServerPID, {request, deliverMSG, NNr, ToClient}} ->
-      deliverMSG(ServerPID, DLQ, NNr, ToClient,HBQLoggerFile)
+      deliverMSG(ServerPID, DLQ, NNr, ToClient, HBQLoggerFile)
       , loop(DlqLimit, HBQname, HBQLoggerFile, HBQ, DLQ)
   ;
     {ServerPID, {request, dellHBQ}} ->
@@ -101,12 +104,10 @@ initHBQandDLQ(Size, ServerPID, HBQLoggerFile) ->
 % return: NewHBQ
 
 pushHBQ(ServerPID, OldHBQ, [NNr, Msg, TSclientout]) ->
+  Tshbqin = erlang:now(),
+  SortedHBQ = sortHBQ(OldHBQ ++ [{NNr, Msg, TSclientout, Tshbqin}]),
   ServerPID ! {reply, ok},
-  NewHBQ = OldHBQ ++ [{NNr, Msg, TSclientout}],
-  %% wir sollten die alte hbq zurückgeben, darauf wird pushToDLq aufgerufen welches entscheidet ob etwas rübergeschoben wird
-  %% und die HBQ neu updated
-  q.
-
+  SortedHBQ.
 
 % deliverMSG(ServerPID, DLQ, NNr, ToClient), erweitert fuer logging
 
@@ -137,8 +138,6 @@ dellHBQ(ServerPID, HBQname) ->
   ServerPID ! {reply, ok}.
 
 
-
-
 %%Definition: Prüft auf Nachrichten / Nachrichtenfolgen, die ohne eine Lücke zu bilden in die DLQ eingefügt werden können.
 %%Prüft außerdem, ob die Anzahl der Nachrichten, die in der HBQ sind, 2/3 der Anzahl beträgt die in die DLQ passen.
 %%Ist dies der Fall, wird einmalig die Lücke der DLQ mit einer Fehlernachricht geschlossen (siehe Anforderung 6).
@@ -148,64 +147,87 @@ dellHBQ(ServerPID, HBQname) ->
 %return: {HBQ, DLQ} als 2-Tupel
 
 
-sortDLQ({_,Queue}) ->
-  ORDER = fun({NNr, _, _, _, _},{_NNr, _, _, _, _}) ->
-    NNr < _NNr end,
-   ists:usort(ORDER,Queue).
-
-getAwaitDLQMessageNr([]) ->
-  1;
-getAwaitDLQMessageNr(SortedDLQ) ->
-  {NNr, _, _, _, _} = lists:last(SortedDLQ),
-  NNr +1.
 
 
 
 
 pushSeries(HBQ, {Size, Queue}) ->
 
-  AwaitNumber = getAwaitDLQMessageNr(sortDLQ({Size, Queue})),
+  %TODO TEST THAT SHEET WITH UNSORTED DLQ CAUSE DLQ SHOULD BE ALREADY SORTED
+  ExpectedMessageNumber = dlq:expectedNrDLQ(dlq:sortDLQ({Size, Queue})),
+
+  {CurrentLastMessageNumber, Msg, TSclientout, TShbqin} = hbq:head(HBQ),
+
+  {NHBQ, NDLQ} = case {ExpectedMessageNumber == CurrentLastMessageNumber, two_thirds_reached(Size, HBQ)} of
+                   {true, _} ->
+                     NewDLQ = dlq:push2DLQ({CurrentLastMessageNumber, Msg, TSclientout, TShbqin}, {Size, Queue}, ?QUEUE_LOGGING_FILE),
+                     NewHBQ = lists:filter(fun({Nr, _, _, _}) -> Nr =/= CurrentLastMessageNumber end,HBQ),
+                     {NewHBQ, NewDLQ};
+                   {false, false} ->
+                     {HBQ, {Size, Queue}};
+                   {false, true} ->
+                     {ConsistentBlock, NewHBQ} = create_consistent_block(HBQ),
+                     {NewHBQ, push_consisten_block_to_dlq(ConsistentBlock, {Size, Queue})}
+                 end,
+  {NHBQ, NDLQ}.
 
 
-  case two_thirds_reached(Size,HBQ) of
 
-    false -> push_consistent_block(Queue, HBQ, Size, []);
+push_consisten_block_to_dlq(ConsistentBlock, DLQ) ->
+  push_consisten_block_to_dlq_(ConsistentBlock, DLQ).
 
-    true -> compact_and_push(Queue,HBQ,Size, [])
+push_consisten_block_to_dlq_([H | T], DLQ) ->
+  NewDLQ = dlq:push2DLQ(H, DLQ, ?QUEUE_LOGGING_FILE),
+  _push_consisten_block_to_dlq(T, NewDLQ);
 
-  end.
+push_consisten_block_to_dlq_([], DLQ) ->
+  DLQ.
 
 
+
+create_consistent_block(L) ->
+  TAIL = erlang:tl(L),
+  create_consistent_block_(L, TAIL, [], 0);
+create_consistent_block([]) ->
+  werkzeug:logging("create_consistent_block wurde mit einer Leeren HBQ aufgerufen, WTF"),
+  {[],[]}.
+
+produce_failure_message(NNr, _NNr) ->
+  {_NNr, "Fehlernachricht von:" ++ NNr ++ " bis" ++ "_NNr", "Error", "Error"}.
+
+create_consistent_block_([H | T], [_H | _T], Accu, Counter) ->
+  {NNr, _, _, _} = H,
+  {_NNr, _, _, _} = _H,
+
+  case {erlang:abs(NNr - _NNr) > 1, Counter == 1} of
+    {true, true} ->
+      {Accu ++ H, _H ++ _T};
+    {true, false} ->
+      NewAccu = Accu ++ produce_failure_message(NNr, _NNr),
+      create_consistent_block_(T, _T, NewAccu, Counter + 1);
+    {false, true} ->
+      create_consistent_block_(T, _T, Accu ++ H, Counter);
+    {false, false} ->
+      create_consistent_block_(T, _T, Accu ++ H, Counter)
+  end;
+
+create_consistent_block_([H | _], [], _, _) ->
+  H.
+
+head([]) ->
+  1;
+head(List) ->
+  erlang:hd(List).
 % pushSeries helper functions
 two_thirds_reached(HBQ, Size) ->
-  erlang:len(HBQ) >= 2/3 * Size.
+  erlang:len(HBQ) >= 2 / 3 * Size.
 
 
 
+sortHBQ({_, Queue}) ->
+  ORDER = fun({NNr, _, _, _}, {_NNr, _, _, _}) ->
+    NNr < _NNr end,
+  lists:usort(ORDER, Queue).
 
 
-push_consistent_block(Queue, [ {MessageNumber, _d, _e} | TailHBQ], Size, []) ->
-  push_consistent_block(Queue++[{MessageNumber, _d, _e}], TailHBQ, Size , []++[MessageNumber]);
-
-push_consistent_block(Queue, [ {MessageNumber, _d, _e} | TailQueue], Size,LastMessageNumberList) ->
-
-  case MessageNumber == lists:last(LastMessageNumberList)+1 of
-
-    true  -> push_consistent_block(Queue++[{MessageNumber, _d, _e}], TailQueue, Size, LastMessageNumberList++[MessageNumber]);
-    false -> {[ {MessageNumber, _d, _e} | TailQueue],{Size,Queue}}
-
-  end.
-
-compact_and_push(Queue, [ {MessageNumber, _d, _e} | TailHBQ], Size, []) ->
-  compact_and_push(Queue++[{MessageNumber, _d, _e}], TailHBQ, Size , []++[MessageNumber]);
-
-% todo:compact_and_push(HBQ, DLQ) how to get next message? oO
-compact_and_push(Queue, [ {MessageNumber, _d, _e} | TailHBQ], Size, LastMessageNumberList) ->
-  case MessageNumber == lists:last(LastMessageNumberList)+1 of
-
-    true  -> compact_and_push(Queue++[{MessageNumber, _d, _e}], TailHBQ, Size, LastMessageNumberList++[MessageNumber]);
-    false -> {Queue, {Size,Queue++[{lists:last(LastMessageNumberList)+1,'ErrorUser','ErrorMessage'}]++'NEXT MESSAGE'}}
-    %{[{NextNumber,NextTime,NextUser} | TailHBQ]
-
-  end.
 

@@ -27,7 +27,7 @@
 % return: server started als Atom sonst eine sinnvolle Error-Meldung
 
 
--define(SERVER_LOGGING_FILE, fun() -> werkzeug:message_to_string(erlang:date()) ++ "-ClientLog.txt" end).
+-define(SERVER_LOGGING_FILE, fun() -> werkzeug:message_to_string(erlang:date()) ++ "-Server.txt" end).
 -include("../tools/ourtools.hrl").
 
 initHBQ(HBQname, HBQnode) ->

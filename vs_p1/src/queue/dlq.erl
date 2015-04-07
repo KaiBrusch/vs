@@ -22,21 +22,8 @@ initDLQ(Size, Datei) ->
   werkzeug:logging('DLQ init', Datei),
   {Size, []}.
 
-% expectedNr(Queue)
 
-%% Definition: Als nächstes zu speichernde Nachrichtennummer wird an HBQ-Prozess zurückgegeben.
 
-% pre: eine Queue in Form der DLQ-ADT (siehe initDLQ)
-% post: Queue ist unverändert und eine korrekte Nachrichtennummer wurde zurückgegeben
-% return: nächste Nachrichtennummer die verwendet werden kann, sonst 1 bei leerer Liste
-
-expectedNr({Size, []}) ->
-  1;
-
-expectedNr({Size, Queue}) ->
-  get_next_message_numer(lists:last(Queue)).
-
-get_next_message_numer([NNr, Msg, TSclientout, TShbqin]) -> NNr + 1.
 
 % push2DLQ([NNr, Msg, TSclientout, TShbqin], Queue, Datei)
 
@@ -48,11 +35,14 @@ get_next_message_numer([NNr, Msg, TSclientout, TShbqin]) -> NNr + 1.
 % return: die neue DLQ: NewDLQ ; wurde die maximale Größe der DLQ erreicht wird eine erkennbare Error-Meldung zurückgegeben
 
 
-push2DLQ([{NNr, Msg, TSclientout, TShbqin}], {Size, Queue}, Datei) ->
+push2DLQ({NNr, Msg, TSclientout, TShbqin}, {Size, Queue}, Datei) ->
 
   case lists:length(Queue) < Size of
-      true -> werkzeug:logging('dlq full', Datei), {dlq_full};
-      false -> werkzeug:logging('added to dlq', Datei), {Size, Queue ++ [{NNr, Msg, TSclientout, erlang:now()}]}
+      true ->
+        werkzeug:logging("Die DLQ ist Voll, Message:"++NNr++" kann nicht verarbeitet werden!", Datei),
+        {Size, Queue};
+      false ->
+        {Size, Queue ++ [{NNr, Msg, TSclientout,TShbqin, erlang:now()}]}
   end.
 
 
@@ -70,13 +60,10 @@ push2DLQ([{NNr, Msg, TSclientout, TShbqin}], {Size, Queue}, Datei) ->
 % DLQ = [{NNr, Msg, TSclientout, TShbqin, TSdlqin}..n]
 
 deliverMSG(MSGNr, ClientPID, {Size, Queue}, Datei) ->
-
-  ORDER = fun({NNr, Msg, TSclientout, TShbqin, TSdlqin},{_NNr, _Msg, _TSclientout, _TShbqin, _TSdlqin}) ->
-    NNr < _NNr end,
-  SortedQueue = lists:usort(ORDER,Queue),
+  SortedQueue = sortDLQ(Queue),
   Result = lists:findkey(MSGNr,1,SortedQueue),
   {NNr, Msg, TSclientout, TShbqin, TSdlqin} = findMessage(SortedQueue,MSGNr,Result),
-  Exists = lists:any(fun({_NNr, _, _, _, _}) -> _NNr > NNr end,SortedQueue),
+  Exists = lists:any(fun({_NNr, _, _, _, _}) -> _NNr > NNr end, SortedQueue),
   Tsdlqout = erlang:now(),
   NewMessage = {reply,[NNr, Msg, TSclientout, TShbqin, TSdlqin,Tsdlqout],Exists},
   ClientPID ! NewMessage.
@@ -94,6 +81,37 @@ findMessage(SortedQueue,MSGNr, false) ->
 
 findMessage(_,_,{NNr, Msg, TSclientout, TShbqin, TSdlqin}) ->
   {NNr, Msg, TSclientout, TShbqin, TSdlqin}.
+
+
+
+
+
+last([]) ->
+  1;
+last(List) ->
+  lists:last(List).
+
+
+sortDLQ({_,Queue}) ->
+  ORDER = fun({NNr, _, _, _, _},{_NNr, _, _, _, _}) ->
+    NNr < _NNr end,
+  lists:usort(ORDER,Queue).
+
+% expectedNr(Queue)
+
+%% Definition: Als nächstes zu speichernde Nachrichtennummer wird an HBQ-Prozess zurückgegeben.
+
+% pre: eine Queue in Form der DLQ-ADT (siehe initDLQ)
+% post: Queue ist unverändert und eine korrekte Nachrichtennummer wurde zurückgegeben
+% return: nächste Nachrichtennummer die verwendet werden kann, sonst 1 bei leerer Liste
+
+
+expectedNrDLQ([]) ->
+  1;
+expectedNrDLQ(SortedDLQ) ->
+  {NNr, _, _, _, _} = lists:last(SortedDLQ),
+  NNr +1.
+
 
 
 
