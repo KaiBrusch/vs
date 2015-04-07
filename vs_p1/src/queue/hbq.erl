@@ -178,16 +178,16 @@ push_consisten_block_to_dlq(ConsistentBlock, DLQ) ->
 
 push_consisten_block_to_dlq_([H | T], DLQ) ->
   NewDLQ = dlq:push2DLQ(H, DLQ, ?QUEUE_LOGGING_FILE),
-  _push_consisten_block_to_dlq(T, NewDLQ);
+  push_consisten_block_to_dlq_(T, NewDLQ);
 
 push_consisten_block_to_dlq_([], DLQ) ->
   DLQ.
 
 
 
-create_consistent_block(L) ->
-  TAIL = erlang:tl(L),
-  create_consistent_block_(L, TAIL, [], 0);
+create_consistent_block([H|T]) ->
+  TAIL = erlang:tl(H ++ T),
+  create_consistent_block_(H ++ T, TAIL, [], 0);
 create_consistent_block([]) ->
   werkzeug:logging("create_consistent_block wurde mit einer Leeren HBQ aufgerufen, WTF"),
   {[],[]}.
