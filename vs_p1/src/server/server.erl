@@ -44,9 +44,7 @@ start() ->
   % lade die Parameter aus der Config Datei
   {Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit} = readConfig(),
 
-  % Logifle fuer den Server log
-  % wo ist das file
-  ServerLogFile = 'server.log',
+
 
   % registriere den Prozess mit dem Erlang Prozess
   erlang:register(Servername, self()),
@@ -61,12 +59,12 @@ start() ->
   initHBQ(HBQname, HBQnode),
 
   % CMEM initialisieren
-  CMEM = cmem:initCMEM(Clientlifetime, ServerLogFile),
+  CMEM = cmem:initCMEM(Clientlifetime, ?SERVER_LOGGING_FILE),
   erlang:display(CMEM),
 
   TimeOfLastConnection = erlang:now(),
 
-  loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ServerLogFile, TimeOfLastConnection).
+  loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ?SERVER_LOGGING_FILE, TimeOfLastConnection).
 
 
 %readConfig()
@@ -209,11 +207,8 @@ sendMessages(ToClient, CMEM, HBQname, HBQnode) ->
   {HBQname, HBQnode} ! {self(), {request, deliverMSG, NNr, ToClient}},
   receive
     {reply, SendNNr} ->
-      erlang:display("received in sendMSG: " ++ werkzeug:to_String(SendNNr)),
-      erlang:display("cmem before update client: " ++ werkzeug:to_String(CMEM)),
       cmem:updateClient(CMEM, ToClient, SendNNr, ?SERVER_LOGGING_FILE)
   after ?MAXIMAL_RESPONSE_TIME_BEFORE_ERROR ->
-    werkzeug:logging(?SERVER_LOGGING_FILE, "sendMessages Failed")
   end.
 
 
