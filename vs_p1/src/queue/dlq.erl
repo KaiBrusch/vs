@@ -10,9 +10,16 @@
 -author("kbrusch").
 -export([initDLQ/2, deliverMSG/4, sortDLQ/1, expectedNrDLQ/1, push2DLQ/3,last/1]).
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% DLQ Datentyp
+%
+% {Size, [{NNr, Msg, TSclientout, TShbqin, TSdlqin}, ...]}
+% {Int, [{Int, String, {Int,Int, Int} , {Int,Int, Int}, {Int,Int, Int}}, ...]}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % initDLQ(Size, Datei)
 
-%% Definition: Vom HBQ-Prozess aufgerufene Methode die eine neue leere DLQ-ADT zurückliefert.
+% Vom HBQ-Prozess aufgerufene Methode die eine neue leere DLQ-ADT zurückliefert.
 
 % pre: keine
 % post: 2-Tupel mit Größenangabe, sowie einer leeren Liste
@@ -23,14 +30,11 @@ initDLQ(Size, Datei) ->
   {Size, []}.
 
 
-
-
 % push2DLQ([NNr, Msg, TSclientout, TShbqin], Queue, Datei)
 
-%% Definition: Die von dem HBQ-Prozess kommende Nachricht im Format: [NNr, Msg, TSclientout, TShbqin] wird in die DLQ eingefügt.
-%% Ebenso wird an die Msg ein aktueller Zeitstempel angehängt, sowie nochmals am Ende des Nachrichtenformates (TSdlqin).
+% Die von dem HBQ-Prozess kommende Nachricht im Format: [NNr, Msg, TSclientout, TShbqin] wird in die DLQ eingefügt.
 
-% pre: Übergabeparameter Queue ist korrekte DLQ-ADT (siehe initDLQ)
+% pre: Übergabeparameter Queue ist korrekte DLQ-ADT
 % post: die DLQ ist nun um eine Nachricht gewachsen, sofern die Größe es zugelassen hat
 % return: die neue DLQ: NewDLQ ; wurde die maximale Größe der DLQ erreicht wird eine erkennbare Error-Meldung zurückgegeben
 
@@ -48,18 +52,15 @@ push2DLQ({NNr, Msg, TSclientout, TShbqin}, {Size, Queue}, Datei) ->
 
 % deliverMSG(MSGNr, ClientPID, Queue, Datei)
 
-%% Definition: Der HBQ-Prozess ruft diese Methode der DLQ auf,
-%% um sie aufzufordern die Nachricht mit angegebener MSGNr an die ClientPID zu senden.
-%% An die Nachricht wird zusätzlich ein Ausgangszeitstempel (TSdlqout) angehängt.
-%% Ist die MSGNr allerdings nicht vorhanden, wird die nächst größere Nummer verwendet.
-%% Das Format der Nachricht die dem Client gesendet wird hat folgende Gestalt: {reply,[NNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout], Terminated}. Terminated signalisiert, ob es noch weitere Nachrichten zu senden gibt (false). Sonst true.
+% Der HBQ-Prozess gibt eine MSGNr die an den Client verschickt werden soll
+% Die Nachrichten an den Client enthält ob es noch weitere Nachrichten für den Client gibt
 
-% pre: die Queue ist in Form der DLQ-ADT (siehe initDLQ), sowie die ClientPID ist korrekt
+% pre: die Queue ist in Form der DLQ-ADT sowie die ClientPID
 % post: eine MSGNr wurde zurückgegeben und die Queue um diese Nachricht verkleinert
 % return: die tatsächlich verschickte MSGNr als Integer-Wert an den HBQ-Prozess
-% DLQ = [{NNr, Msg, TSclientout, TShbqin, TSdlqin}..n]
 
 deliverMSG(MSGNr, ClientPID, {Size, Queue}, Datei) ->
+  % todo hier noch loggen
   {_Size,SortedQueue} = sortDLQ({Size, Queue}),
   Result = lists:keyfind(MSGNr,1,SortedQueue),
   {NNr, Msg, TSclientout, TShbqin, TSdlqin} = findMessage(SortedQueue,MSGNr,Result),
@@ -70,8 +71,14 @@ deliverMSG(MSGNr, ClientPID, {Size, Queue}, Datei) ->
 
 
 
+% findMessage(SortedQueue, MSGNr, Gefunden)
 
-%%hier kann passieren das wenn der client nach einer zu hohen nachricht fragt wie im nirvana landen
+% Suche nach einer gegeben Nachrichtennummer in einer sortierten Queue
+
+% pre: die Queue ist eine Liste und die MSGNr ist eine Nummer
+% post: Die Queue wurde nich veraender
+% return: Die Nachricht als Tupel mit der Nachrichtennummer
+
 %% todo beheben wenn zeit und bedarf und lust
 findMessage([],_, _) ->
   {0, "DUMMY", "DUMMY", "DUMMY", "DUMMY"} ;
@@ -83,39 +90,44 @@ findMessage(_,_,{NNr, Msg, TSclientout, TShbqin, TSdlqin}) ->
   {NNr, Msg, TSclientout, TShbqin, TSdlqin}.
 
 
+% last(DLQ)
 
+% Holt das letzte Element der DLQ
 
+% pre: eine korrekte DLQ wurde uebergeben
+% post: Wir haben die letzte Nachricht der DLQ
+% return: gibt das letzte Element der Liste der DLQ zuruck
 
 last({Size,[]}) ->
   1;
 last({Size,List}) ->
   lists:last(List).
 
+% sortDLQ(DLQ)
+
+% Sortiert die DLQ anhang der Nachrichtennummern
+
+% pre: eine korrekte DLQ wurde uebergeben in einer beliebigen reihenfolge
+% post: die uebergebene DLQ ist in aufsteigender Nachrichtennummer folge
+% return: Gibt die sortierte DLQ zurueck
 
 sortDLQ({Size,Queue}) ->
   ORDER = fun({NNr, _, _, _, _},{_NNr, _, _, _, _}) ->
     NNr < _NNr end,
   {Size,lists:usort(ORDER,Queue)}.
 
-% expectedNr(Queue)
 
-%% Definition: Als nächstes zu speichernde Nachrichtennummer wird an HBQ-Prozess zurückgegeben.
+% expectedNrDLQ(DLQ)
 
-% pre: eine Queue in Form der DLQ-ADT (siehe initDLQ)
+% Als nächstes zu speichernde Nachrichtennummer wird gefunden, falls
+% die DLQ leer ist wird eine 1 zurueck gegeben
+
+% pre: eine Queue in Form der DLQ-ADT
 % post: Queue ist unverändert und eine korrekte Nachrichtennummer wurde zurückgegeben
 % return: nächste Nachrichtennummer die verwendet werden kann, sonst 1 bei leerer Liste
-
 
 expectedNrDLQ({_,[]}) ->
   1;
 expectedNrDLQ({_,SortedDLQ}) ->
   {NNr, _, _, _, _} = lists:last(SortedDLQ),
   NNr +1.
-
-
-
-
-
-
-
-
