@@ -59,8 +59,6 @@ start() ->
 
   % CMEM initialisieren
   CMEM = cmem:initCMEM(Clientlifetime, ?SERVER_LOGGING_FILE),
-  erlang:display(CMEM),
-
   TimeOfLastConnection = erlang:now(),
 
   loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR, ?SERVER_LOGGING_FILE, TimeOfLastConnection).
@@ -85,8 +83,8 @@ readConfig() ->
   {ok, DLQlimit} = werkzeug:get_config_value(dlqlimit, ConfigListe),
   {ok, HBQname} = werkzeug:get_config_value(hbqname, ConfigListe),
   {ok, HBQnode} = werkzeug:get_config_value(hbqnode, ConfigListe),
-  erlang:display(HBQname),
-  erlang:display(HBQnode),
+
+
 
 
   {Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit}.
@@ -195,7 +193,6 @@ sendMSGID(ClientPID, INNR) ->
 sendMessages(ToClient, CMEM, HBQname, HBQnode) ->
 
   NNr = cmem:getClientNNr(CMEM, ToClient),
-  erlang:display("client NNR: " ++ werkzeug:to_String(NNr)),
   {HBQname, HBQnode} ! {self(), {request, deliverMSG, NNr, ToClient}},
   receive
     {reply, SendNNr} ->

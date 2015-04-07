@@ -65,12 +65,11 @@ start() ->
   %ists:foreach(fun(X) ->
 
   spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client1))
- % spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client2)),
- % spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client3)),
- % spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client4)),
- % spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client5))
-  .
-
+% spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client2)),
+% spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client3)),
+% spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client4)),
+% spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client5))
+.
 
 
 % readConfig()
@@ -99,10 +98,8 @@ readConfig() ->
 loop(Lifetime, Servername, Servernode, Sendinterval, ClientName) ->
   % registriere den Prozess mit dem Erlang Prozess
 
-  REGISTER_RESULT = erlang:register(ClientName, self()),
-  erlang:display(REGISTER_RESULT),
-  erlang:display(Servernode),
-  erlang:display(net_adm:ping(Servernode)),
+  erlang:register(ClientName, self()),
+
 
   %% Anders als in dem Entwurf wird die transmittedMsg mit 1 initialisiert um die Verarbeitung in der Loop zu vereinfachen
 
@@ -206,7 +203,6 @@ sendMSG(Servername, Servernode, TimeLastSending, Interval, INNRflag) ->
       if Flag ->
         TSClientout = erlang:now(),
         {Servername, Servernode} ! {dropmessage, [INNr, Msg, TSClientout]},
-        % todo hier kommt ein tupel zurueck, HIIIIIER
         TSClientout;
         true ->
           werkzeug:logging(?CLIENT_LOGGING_FILE, "got an INNr error" ++ werkzeug:to_String(now()))
