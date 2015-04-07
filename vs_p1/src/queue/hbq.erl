@@ -227,7 +227,6 @@ two_thirds_reached(HBQ, Size) ->
 
 
 sortHBQ(Queue) ->
-  erlang:display("das ist die queue"++werkzeug:to_String(Queue)),
   ORDER = fun({NNr, _, _, _}, {_NNr, _, _, _}) ->
     NNr < _NNr end,
   lists:usort(ORDER, Queue).

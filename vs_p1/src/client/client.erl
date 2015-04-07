@@ -29,7 +29,7 @@ timestamp_to_millis({MegaSecs, Secs, MicroSecs}) ->
   (MegaSecs * 1000000 + Secs) * 1000 + round(MicroSecs / 1000).
 
 
-is_time_over(0, Lifetime) ->
+is_time_over(0, _) ->
   true;
 is_time_over(Start, Lifetime) ->
   (timestamp_to_millis(erlang:now()) - timestamp_to_millis(Start)) >= Lifetime * 1000.
@@ -64,11 +64,12 @@ start() ->
   % Range = lists:seq(1, Clients),
   %ists:foreach(fun(X) ->
 
-  spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client1)),
-  spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client2)),
-  spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client3)),
-  spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client4)),
-  spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client5)).
+  spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client1))
+ % spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client2)),
+ % spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client3)),
+ % spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client4)),
+ % spawn(loop(Lifetime, Servername, Servernode, Sendinterval, client5))
+  .
 
 
 

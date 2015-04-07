@@ -7,10 +7,21 @@
 %%% Created : 02. Apr 2015 10:06 AM
 %%%-------------------------------------------------------------------
 
+
+%%% CMEM
+%% {Clientlifetime,CMEM} {Int,[{<PID>,Int,{Int,Int,Int}}]}
+%% Clientlifetime,CMEM} {Size,[{ClientPID,LastMessageID,LastMessageTimestamp}]}
+
 -module(cmem).
 -author("kbrusch").
 -export([initCMEM/2, getClientNNr/2, updateClient/4, delExpiredCl/1]).
 -include("../tools/ourtools.hrl").
+
+
+
+
+
+
 
 % initCMEM(RemTime, Datei)
 
@@ -33,12 +44,14 @@ initCMEM(Clientlifetime, Datei) ->
 %% return: aktualisiertes CMEM
 
 
+%% {Clientlifetime,CMEM} {Int,[{<PID>,Int,{Int,Int,Int}}]}
+%% Clientlifetime,CMEM} {Size,[{ClientPID,LastMessageID,LastMessageTimestamp}]}
+
 
 updateClient({Clientlifetime,CMEM}, ClientID, NNr, Datei) ->
   F = fun({_ClientID,_LastMessageNumer, _Time}) -> _ClientID =/= ClientID end,
   _NewCMEM = lists:filter(F,CMEM),
-  _NewCMEM ++ {ClientID,NNr,erlang:now()},
-  {Clientlifetime,_NewCMEM}.
+  {Clientlifetime,_NewCMEM ++ [{ClientID,NNr,erlang:now()}]}.
 
 
 % getClientNNr(CMEM, ClientID)
@@ -67,16 +80,13 @@ get_last_message_id(ClientID, CMEM) ->
 
 %pre: keine
 %post: veränderte CMEM
-%return: Das Atom ok als Rückgabewert
+%return: Das Atom ok als Rückgabewert // falsch veränderte CMEM
 
 delExpiredCl({Clientlifetime, Queue}) ->
   erlang:display({Clientlifetime, Queue}),
   Now = timestamp_to_millis(erlang:now()),
-  erlang:display(Now),
-  erlang:display(Queue),
-  F = fun(X) -> 1>2 end,
+  F = fun({_ClientID,_LastMessageNumer, _Time}) -> (Now - timestamp_to_millis(_Time)) > Clientlifetime * 1000   end,
   NewQueue = lists:filter(F,Queue),
-  erlang:display(NewQueue),
   {Clientlifetime,NewQueue}.
 
 
