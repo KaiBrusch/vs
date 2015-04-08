@@ -68,11 +68,30 @@ push2DLQ({NNr, Msg, TSclientout, TShbqin}, {Size, Queue}, Datei) ->
 % return: die tatsächlich verschickte MSGNr als Integer-Wert an den HBQ-Prozess
 
 deliverMSG(MSGNr, ClientPID, {Size, Queue}) ->
-  % todo hier noch loggen
+
+  werkzeug:logging(?QUEUE_LOGGING_FILE,
+    "Body of dilverMSG logging routine for MSGNr" ++
+      werkzeug:to_String(MSGNr) ++
+      " \n"
+  ),
+
   {_Size,SortedQueue} = sortDLQ({Size, Queue}),
+
+  werkzeug:logging(?QUEUE_LOGGING_FILE,
+    "Body of dilverMSG logging routine Sort DLQ  {_Size,SortedQueue}:" ++
+      werkzeug:to_String( {_Size,SortedQueue}) ++
+      " \n"),
+
   Result = lists:keyfind(MSGNr,1,SortedQueue),
   {NNr, Msg, TSclientout, TShbqin, TSdlqin} = findMessage(SortedQueue,MSGNr,Result),
+
   Exists = lists:any(fun({_NNr, _, _, _, _}) -> _NNr > NNr end, SortedQueue),
+
+    werkzeug:logging(?QUEUE_LOGGING_FILE,
+      "Set Exists Flag is:" ++
+        werkzeug:to_String( Exists) ++
+        " \n"),
+
   Tsdlqout = erlang:now(),
   NewMessage = {reply,[NNr, Msg, TSclientout, TShbqin, TSdlqin,Tsdlqout],Exists},
   ClientPID ! NewMessage.

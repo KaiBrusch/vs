@@ -26,7 +26,7 @@
 % return: server started als Atom sonst eine sinnvolle Error-Meldung
 
 
--define(SERVER_LOGGING_FILE, fun() -> werkzeug:message_to_string(erlang:date()) ++ "-Server.txt" end).
+-define(SERVER_LOGGING_FILE, "-Server.txt").
 -include("../tools/ourtools.hrl").
 
 initHBQ(HBQname, HBQnode) ->
@@ -182,7 +182,7 @@ loop(Latency, Clientlifetime, Servername, HBQname, HBQnode, DLQlimit, CMEM, INNR
           ),
 
           sendMSGID(ClientPID, INNR),
-          NewCMEM = cmem:updateClient(_CMEM, ClientPID, INNR, ServerLogFile),
+          NewCMEM = cmem:updateClient(_CMEM, ClientPID, INNR, ServerLogFile,time),
 
 
           werkzeug:logging(?SERVER_LOGGING_FILE,
@@ -276,7 +276,7 @@ sendMessages(ToClient, CMEM, HBQname, HBQnode) ->
       ),
 
 
-      cmem:updateClient(CMEM, ToClient, SendNNr, ?SERVER_LOGGING_FILE)
+      cmem:updateClient(CMEM, ToClient, SendNNr, ?SERVER_LOGGING_FILE,sendmsg)
   after ?MAXIMAL_RESPONSE_TIME_BEFORE_ERROR ->
     werkzeug:logging('HBQ DOES NOT REPLY DELIVER MESSAGE', ?SERVER_LOGGING_FILE)
   end.

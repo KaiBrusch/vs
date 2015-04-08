@@ -16,7 +16,7 @@
 -define(GRUPPE, '3').
 -define(TEAM, '06').
 -define(MAXIMAL_RESPONSE_TIME_BEFORE_ERROR, 5000).
--define(CLIENT_LOGGING_FILE, "-ClientLog.txt" end).
+-define(CLIENT_LOGGING_FILE, "ClientLog.txt").
 -define(REDAKTEUR_ATOM, redakteur).
 -define(LESER_ATOM, leser).
 -define(RECHNER_NAME, 'rechner@123').
@@ -194,8 +194,16 @@ getMSG(Servername, Servernode) ->
   receive
     {reply, [NNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout], true} ->
       logIncomeMsg([NNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout], erlang:now()),
+      werkzeug:logging(?CLIENT_LOGGING_FILE, "Client get message NR:" ++
+        werkzeug:to_String(NNr) ++
+        "with an repeat flag: true" ++
+        "\n"),
       getMSG(Servername, Servernode);
     {reply, [NNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout], false} ->
+      werkzeug:logging(?CLIENT_LOGGING_FILE, "Client get message NR:" ++
+        werkzeug:to_String(NNr) ++
+        "with an repeat flag: false" ++
+        "\n"),
       logIncomeMsg([NNr, Msg, TSclientout, TShbqin, TSdlqin, TSdlqout], erlang:now()),
       ok
   after ?MAXIMAL_RESPONSE_TIME_BEFORE_ERROR ->

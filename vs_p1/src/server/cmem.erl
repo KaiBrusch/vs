@@ -14,7 +14,7 @@
 
 -module(cmem).
 -author("kbrusch").
--export([initCMEM/2, getClientNNr/2, updateClient/4, delExpiredCl/1]).
+-export([initCMEM/2, getClientNNr/2, updateClient/5, delExpiredCl/1]).
 -include("../tools/ourtools.hrl").
 
 
@@ -48,10 +48,29 @@ initCMEM(Clientlifetime, Datei) ->
 %% Clientlifetime,CMEM} {Size,[{ClientPID,LastMessageID,LastMessageTimestamp}]}
 
 
-updateClient({Clientlifetime,CMEM}, ClientID, NNr, Datei) ->
+
+
+updateClient({Clientlifetime,CMEM}, ClientID, NNr, Datei,sendmsg) ->
   F = fun({_ClientID,_LastMessageNumer, _Time}) -> _ClientID =/= ClientID end,
   _NewCMEM = lists:filter(F,CMEM),
-  {Clientlifetime,_NewCMEM ++ [{ClientID,NNr,erlang:now()}]}.
+  {Clientlifetime,_NewCMEM ++ [{ClientID,NNr,erlang:now()}]};
+
+updateClient({Clientlifetime,CMEM}, ClientID, NNr, Datei,time) ->
+  %Find = fun({_ClientID,_LastMessageNumer, _Time}) -> _ClientID == ClientID end,
+
+  Filter = fun({_ClientID,_LastMessageNumer, _Time}) -> _ClientID =/= ClientID end,
+  {CClientID,LLastMessageNumber,TTime} =
+    case lists:keyfind(ClientID,1,CMEM) of
+      {ClientID,LastMessageNumber,Time} ->
+        {ClientID,LastMessageNumber,Time};
+      false ->
+        {ClientID,NNr,erlang:now()}
+    end,
+
+
+  _NewCMEM = lists:filter(Filter,CMEM),
+
+  {Clientlifetime,_NewCMEM ++ [{ClientID,LLastMessageNumber,erlang:now()}]}.
 
 
 % getClientNNr(CMEM, ClientID)
