@@ -213,6 +213,10 @@ pushSeries(HBQ, {Size, Queue}) ->
 
 % Ubergibt einen konsistenten Block an die DLQ
 
+% pre: Einen konsistenten Block an Nachrichten und die DLQ
+% post: veränderte HBQ- und DLQ-Datenstruktur
+% return: {HBQ, DLQ} als 2-Tupel
+
 push_consisten_block_to_dlq(ConsistentBlock, DLQ) ->
   push_consisten_block_to_dlq_(ConsistentBlock, DLQ).
 
@@ -223,6 +227,14 @@ push_consisten_block_to_dlq_([H | T], DLQ) ->
 push_consisten_block_to_dlq_([], DLQ) ->
   DLQ.
 
+
+% create_consisten_block(ConsistentBlock,DLQ)
+
+% Erstellt einen konsistenten Nachrichtenblock aus einer Liste
+
+% pre: Eine Liste
+% post: Die laengste aufeinanderfolgende Nachrichtennummer folge aus der Liste wurde in die DLQ eingefuegt
+% return: Die laengste aufeinanderfolgende Nachrichtennummer folge aus der Liste
 
 
 create_consistent_block([H | T]) ->
@@ -253,6 +265,9 @@ create_consistent_block_([H | T], [_H | _T], Accu, Counter) ->
 
 create_consistent_block_([H | _], [], _, _) ->
   H.
+
+
+% Helper funktionen fuer die HBQ
 
 head([]) ->
   1;
